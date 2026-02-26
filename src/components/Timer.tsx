@@ -10,7 +10,7 @@ interface TimerProps {
 }
 
 export const Timer: React.FC<TimerProps> = ({ taskId, onTimeUpdate, isRunning: initialIsRunning }) => {
-  const [isRunning, setIsRunning] = useState(initialIsRunning);
+  const [isRunning, setIsRunning] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [activeLogId, setActiveLogId] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);

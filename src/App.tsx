@@ -99,7 +99,7 @@ export default function App() {
             </button>
             <div>
               <h2 className="text-xl lg:text-3xl font-bold text-slate-900 tracking-tight">
-                {activeTab === 'dashboard' ? 'Tổng quan' : 'Quản lý bản vẽ'}
+                {activeTab === 'dashboard' ? 'Tổng quan' : 'Quản lý dự án'}
               </h2>
               <p className="text-slate-500 mt-1 text-xs lg:text-base hidden sm:block">
                 {activeTab === 'dashboard' 
@@ -113,7 +113,7 @@ export default function App() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
                 type="text" 
-                placeholder="Tìm kiếm bản vẽ..." 
+                placeholder="Tìm kiếm dự án..." 
                 className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all w-48 lg:w-64"
               />
             </div>
@@ -139,7 +139,7 @@ export default function App() {
             <div className="space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                 <StatCard 
-                  title="Tổng số bản vẽ" 
+                  title="Tổng số dự án" 
                   value={totalTasks} 
                   icon={Files} 
                   color="blue"
@@ -167,7 +167,7 @@ export default function App() {
               <div className="bg-white p-4 lg:p-8 rounded-2xl border border-slate-200 shadow-sm">
                 <h3 className="text-base lg:text-lg font-bold text-slate-900 flex items-center gap-2 mb-6">
                   <BarChart3 className="text-emerald-500" size={20} />
-                  Biểu đồ năng suất (7 bản vẽ gần nhất)
+                  Biểu đồ năng suất (7 dự án gần nhất)
                 </h3>
                 <div className="h-[300px] lg:h-[350px] w-full">
                   <ResponsiveContainer width="100%" height="100%">

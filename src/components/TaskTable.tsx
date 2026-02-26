@@ -35,7 +35,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
         <table className="min-w-full w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 border-bottom border-slate-200">
-              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tên bản vẽ</th>
+              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tên dự án</th>
+              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Thông tin dự án</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Kỹ sư</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Độ khó</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Trạng thái</th>
@@ -49,9 +50,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
             {tasks.map((task) => (
               <tr key={task.id} className="hover:bg-slate-50/50 transition-colors group">
                 <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                  <span className="font-medium text-slate-900">{task.drawing_name}</span>
+                </td>
+                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   <div className="flex flex-col">
-                    <span className="font-medium text-slate-900">{task.drawing_name}</span>
-                    <span className="text-xs text-slate-500">Dự án ID: {task.project_id.slice(0, 8)}...</span>
+                    <span className="text-xs text-slate-500">ID: {task.project_id.slice(0, 8)}...</span>
+                    <span className="text-xs text-slate-400">{new Date(task.created_at).toLocaleDateString('vi-VN')}</span>
                   </div>
                 </td>
                 <td className="px-4 md:px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{task.engineer_name}</td>
