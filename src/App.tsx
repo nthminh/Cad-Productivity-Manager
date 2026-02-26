@@ -292,7 +292,7 @@ export default function App() {
       )}
 
       {showTaskForm && (
-        <TaskForm onClose={() => setShowTaskForm(false)} onSuccess={() => {}} />
+        <TaskForm onClose={() => setShowTaskForm(false)} onSuccess={() => setShowTaskForm(false)} />
       )}
     </div>
   );
