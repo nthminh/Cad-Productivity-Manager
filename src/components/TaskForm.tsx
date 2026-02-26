@@ -67,7 +67,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
             <div className="bg-emerald-500 p-2 rounded-lg">
               <HardHat className="text-white" size={20} />
             </div>
-            <h2 className="font-bold text-slate-900 text-lg">Thêm bản vẽ mới</h2>
+            <h2 className="font-bold text-slate-900 text-lg">Thêm dự án mới</h2>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-rose-500 transition-colors">
             <X size={24} />
@@ -83,13 +83,13 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
           {success && (
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 font-medium flex items-center gap-2">
               <CheckCircle2 size={16} />
-              Thêm bản vẽ thành công!
+              Thêm dự án thành công!
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-                <FileText size={14} /> Tên bản vẽ
+                <FileText size={14} /> Tên dự án
               </label>
               <input
                 required
@@ -175,7 +175,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
               className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
             >
               <Save size={20} />
-              {loading ? 'Đang lưu...' : 'Lưu bản vẽ'}
+              {loading ? 'Đang lưu...' : 'Lưu dự án'}
             </button>
           </div>
         </form>
