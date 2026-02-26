@@ -15,7 +15,7 @@ export type Task = {
   target_hours: number;
   actual_hours: number;
   cost: number | null;
-  status: 'Đang làm' | 'Chờ duyệt' | 'Hoàn thành';
+  status: 'Đang làm' | 'Chờ duyệt' | 'Hoàn thành' | 'Đã hủy' | 'Tạm hoãn';
   drive_link: string | null;
   viewer_link: string | null;
   deadline: string | null;

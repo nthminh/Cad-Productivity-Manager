@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Trash2, CheckCircle, Clock, RefreshCw, Pencil } from 'lucide-react';
+import { Trash2, CheckCircle, Clock, RefreshCw, Pencil, XCircle, PauseCircle } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { Task } from '../types/database.types';
@@ -90,13 +90,31 @@ export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose,
             Chuyển sang Chờ duyệt
           </button>
         )}
+        {task.status !== 'Đã hủy' && (
+          <button
+            onClick={() => handleStatusChange('Đã hủy')}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-rose-500 hover:bg-rose-50 transition-colors"
+          >
+            <XCircle size={16} />
+            Đã hủy
+          </button>
+        )}
+        {task.status !== 'Tạm hoãn' && (
+          <button
+            onClick={() => handleStatusChange('Tạm hoãn')}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-500 hover:bg-slate-50 transition-colors"
+          >
+            <PauseCircle size={16} />
+            Tạm hoãn
+          </button>
+        )}
         <div className="my-1 border-t border-slate-100" />
         <button
           onClick={handleDelete}
           className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors"
         >
           <Trash2 size={16} />
-          Xóa bản vẽ
+          Xóa
         </button>
       </div>
     </div>
