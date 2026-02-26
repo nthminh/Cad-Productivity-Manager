@@ -1,20 +1,6 @@
 import { initializeApp, getApp, getApps } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-// --- Hardcoded Firebase Configuration ---
-// Fill in these values to embed the Firebase config directly in the app so all
-// users share the same database without needing to configure anything themselves.
-// Leave the fields empty to fall back to environment variables or the Settings page.
-const HARDCODED_FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
-};
-// ----------------------------------------
-
 const getFirebaseConfig = () => {
   // Priority 1: Environment Variables (Secrets)
   const envConfig = {
@@ -30,12 +16,7 @@ const getFirebaseConfig = () => {
     return envConfig;
   }
 
-  // Priority 2: Hardcoded config (set at build/deploy time by the developer)
-  if (HARDCODED_FIREBASE_CONFIG.apiKey && HARDCODED_FIREBASE_CONFIG.projectId) {
-    return HARDCODED_FIREBASE_CONFIG;
-  }
-
-  // Priority 3: LocalStorage (Manual Input via Settings page)
+  // Priority 2: LocalStorage (Manual Input via Settings page)
   const savedConfig = localStorage.getItem('firebase_config');
   if (savedConfig) {
     try {
@@ -64,5 +45,4 @@ if (config) {
 
 export const db = dbInstance;
 export const isFirebaseConfigured = !!dbInstance;
-export const isHardcodedConfigActive =
-  !!(HARDCODED_FIREBASE_CONFIG.apiKey && HARDCODED_FIREBASE_CONFIG.projectId);
+export const isHardcodedConfigActive = false;

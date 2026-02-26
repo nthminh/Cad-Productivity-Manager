@@ -23,7 +23,6 @@ import { Sidebar } from './components/Sidebar';
 import { StatCard } from './components/StatCard';
 import { TaskTable } from './components/TaskTable';
 import { DrawingViewer } from './components/DrawingViewer';
-import { FirebaseSetup } from './components/FirebaseSetup';
 import { TaskForm } from './components/TaskForm';
 import { db, isFirebaseConfigured } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
@@ -39,6 +38,7 @@ export default function App() {
 
   useEffect(() => {
     if (!isFirebaseConfigured || !db) {
+      setError("Firebase is not configured. Please set up your environment variables.");
       setLoading(false);
       return;
     }
@@ -64,13 +64,6 @@ export default function App() {
   }, []);
 
   const fetchTasks = () => {};
-
-  // If Firebase is not configured, force the settings tab
-  useEffect(() => {
-    if (!isFirebaseConfigured && activeTab !== 'settings') {
-      setActiveTab('settings');
-    }
-  }, [activeTab]);
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'Hoàn thành').length;
@@ -134,9 +127,7 @@ export default function App() {
           </div>
         </header>
 
-        {activeTab === 'settings' ? (
-          <FirebaseSetup />
-        ) : activeTab === 'dashboard' ? (
+        {activeTab === 'dashboard' ? (
           <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatCard 
