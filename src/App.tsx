@@ -7,7 +7,8 @@ import {
   Plus, 
   Search, 
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Menu // Import the Menu icon
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -35,6 +36,7 @@ export default function App() {
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !db) {
@@ -71,14 +73,6 @@ export default function App() {
   const totalTargetHours = tasks.reduce((acc, t) => acc + t.target_hours, 0);
   const avgProductivity = totalActualHours > 0 ? (totalTargetHours / totalActualHours) * 100 : 0;
 
-  const upcomingDeadlines = tasks
-    .filter(t => t.deadline && t.status !== 'Hoàn thành' && new Date(t.deadline) >= new Date())
-    .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
-    .slice(0, 3);
-
-  const overdueTasks = tasks
-    .filter(t => t.deadline && t.status !== 'Hoàn thành' && new Date(t.deadline) < new Date());
-
   const chartData = tasks.slice(0, 7).map(t => ({
     name: t.drawing_name.length > 10 ? t.drawing_name.slice(0, 10) + '...' : t.drawing_name,
     productivity: t.actual_hours > 0 ? (t.target_hours / t.actual_hours) * 100 : 0,
@@ -87,95 +81,95 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+      />
 
-      <main className="flex-1 p-8 overflow-y-auto">
-        {error && (
-          <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-700">
-            <AlertCircle size={20} />
-            <p className="text-sm font-medium">{error}</p>
-          </div>
-        )}
-
-        <header className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-3xl font-bold text-slate-900 tracking-tight">
-              {activeTab === 'dashboard' ? 'Tổng quan năng suất' : 'Quản lý bản vẽ'}
-            </h2>
-            <p className="text-slate-500 mt-1">
-              {activeTab === 'dashboard' 
-                ? 'Theo dõi các chỉ số hiệu quả công việc của đội ngũ kỹ sư.' 
-                : 'Danh sách chi tiết các nhiệm vụ và tiến độ thiết kế.'}
-            </p>
+      <div className="flex-1 flex flex-col">
+        <header className="flex items-center justify-between p-4 lg:p-8 bg-slate-50/80 backdrop-blur-sm sticky top-0 z-20 border-b border-slate-200">
+          <div className="flex items-center gap-4">
+            <button 
+              className="lg:hidden text-slate-600 hover:text-slate-900"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
+              <Menu size={24} />
+            </button>
+            <div>
+              <h2 className="text-xl lg:text-3xl font-bold text-slate-900 tracking-tight">
+                {activeTab === 'dashboard' ? 'Tổng quan' : 'Quản lý bản vẽ'}
+              </h2>
+              <p className="text-slate-500 mt-1 text-xs lg:text-base hidden sm:block">
+                {activeTab === 'dashboard' 
+                  ? 'Theo dõi các chỉ số hiệu quả công việc.' 
+                  : 'Danh sách chi tiết các nhiệm vụ và tiến độ.'}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="relative">
+            <div className="relative hidden md:block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
                 type="text" 
                 placeholder="Tìm kiếm bản vẽ..." 
-                className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all w-64"
+                className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all w-48 lg:w-64"
               />
             </div>
             <button 
               onClick={() => setShowTaskForm(true)}
-              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-3 lg:px-5 py-2.5 rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
             >
-              <Plus size={20} />
-              Thêm Task mới
+              <Plus size={20} className="hidden sm:inline-block"/>
+              <span className="text-sm sm:text-base">Thêm Task</span>
             </button>
           </div>
         </header>
 
-        {activeTab === 'dashboard' ? (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard 
-                title="Tổng số bản vẽ" 
-                value={totalTasks} 
-                icon={Files} 
-                color="blue"
-                trend={{ value: 12, isPositive: true }}
-              />
-              <StatCard 
-                title="Tổng giờ làm việc" 
-                value={`${totalActualHours.toFixed(1)}h`} 
-                icon={Clock} 
-                color="amber"
-              />
-              <StatCard 
-                title="Bản vẽ hoàn thành" 
-                value={completedTasks} 
-                icon={FileCheck} 
-                color="emerald"
-              />
-              <StatCard 
-                title="Năng suất TB" 
-                value={`${avgProductivity.toFixed(1)}%`} 
-                icon={TrendingUp} 
-                color={avgProductivity > 100 ? 'emerald' : avgProductivity < 80 ? 'rose' : 'blue'}
-              />
+        <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
+          {error && (
+            <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-700">
+              <AlertCircle size={20} />
+              <p className="text-sm font-medium">{error}</p>
             </div>
+          )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex items-center justify-between mb-8">
-                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <BarChart3 className="text-emerald-500" size={20} />
-                    Biểu đồ năng suất (7 bản vẽ gần nhất)
-                  </h3>
-                  <div className="flex items-center gap-4 text-xs font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                      <span className="text-slate-500">&gt; 100% (Tốt)</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 rounded-full bg-rose-500"></div>
-                      <span className="text-slate-500">&lt; 80% (Cần cải thiện)</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="h-[350px] w-full">
+          {activeTab === 'dashboard' ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+                <StatCard 
+                  title="Tổng số bản vẽ" 
+                  value={totalTasks} 
+                  icon={Files} 
+                  color="blue"
+                />
+                <StatCard 
+                  title="Tổng giờ làm" 
+                  value={`${totalActualHours.toFixed(1)}h`} 
+                  icon={Clock} 
+                  color="amber"
+                />
+                <StatCard 
+                  title="Hoàn thành" 
+                  value={completedTasks} 
+                  icon={FileCheck} 
+                  color="emerald"
+                />
+                <StatCard 
+                  title="Năng suất TB" 
+                  value={`${avgProductivity.toFixed(1)}%`} 
+                  icon={TrendingUp} 
+                  color={avgProductivity > 100 ? 'emerald' : avgProductivity < 80 ? 'rose' : 'blue'}
+                />
+              </div>
+
+              <div className="bg-white p-4 lg:p-8 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="text-base lg:text-lg font-bold text-slate-900 flex items-center gap-2 mb-6">
+                  <BarChart3 className="text-emerald-500" size={20} />
+                  Biểu đồ năng suất (7 bản vẽ gần nhất)
+                </h3>
+                <div className="h-[300px] lg:h-[350px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -183,13 +177,13 @@ export default function App() {
                         dataKey="name" 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fill: '#64748b', fontSize: 12 }}
+                        tick={{ fill: '#64748b', fontSize: 10 }}
                         dy={10}
                       />
                       <YAxis 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fill: '#64748b', fontSize: 12 }}
+                        tick={{ fill: '#64748b', fontSize: 10 }}
                         unit="%"
                       />
                       <Tooltip 
@@ -202,7 +196,7 @@ export default function App() {
                         }}
                         formatter={(value: number) => [`${value.toFixed(1)}%`, 'Năng suất']}
                       />
-                      <Bar dataKey="productivity" radius={[6, 6, 0, 0]} barSize={40}>
+                      <Bar dataKey="productivity" radius={[4, 4, 0, 0]} barSize={25}>
                         {chartData.map((entry, index) => (
                           <Cell 
                             key={`cell-${index}`} 
@@ -214,69 +208,18 @@ export default function App() {
                   </ResponsiveContainer>
                 </div>
               </div>
-
-              <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-900 mb-6">Hạn chót sắp tới</h3>
-                <div className="space-y-6">
-                  {upcomingDeadlines.map((task) => (
-                    <div key={task.id} className="flex gap-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <div className="bg-amber-100 p-2 rounded-lg h-fit">
-                        <Clock className="text-amber-600" size={18} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-900 leading-none">{task.drawing_name}</p>
-                        <p className="text-xs text-rose-500 font-medium mt-1">
-                          Hạn: {new Date(task.deadline!).toLocaleDateString('vi-VN')}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                  {overdueTasks.length > 0 && (
-                    <div className="mt-4 p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-2 text-rose-700">
-                      <AlertCircle size={16} />
-                      <span className="text-xs font-bold">Có {overdueTasks.length} task quá hạn!</span>
-                    </div>
-                  )}
-                  {upcomingDeadlines.length === 0 && overdueTasks.length === 0 && (
-                    <p className="text-sm text-slate-500 italic">Không có hạn chót nào sắp tới.</p>
-                  )}
-                </div>
-
-                <h3 className="text-lg font-bold text-slate-900 mt-10 mb-6">Hoạt động gần đây</h3>
-                <div className="space-y-6">
-                  {tasks.slice(0, 5).map((task) => (
-                    <div key={task.id} className="flex gap-4">
-                      <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
-                        task.status === 'Hoàn thành' ? 'bg-emerald-500' : 'bg-blue-500'
-                      }`}></div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-900 leading-none">{task.drawing_name}</p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          {task.engineer_name} - {task.status}
-                        </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {new Date(task.created_at).toLocaleDateString('vi-VN')}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                  {tasks.length === 0 && (
-                    <p className="text-sm text-slate-500 italic">Chưa có hoạt động nào.</p>
-                  )}
-                </div>
-              </div>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <TaskTable 
-              tasks={tasks} 
-              onRefresh={fetchTasks} 
-              onViewDrawing={(url) => setViewerUrl(url)} 
-            />
-          </div>
-        )}
-      </main>
+          ) : (
+            <div className="space-y-6">
+              <TaskTable 
+                tasks={tasks} 
+                onRefresh={fetchTasks} 
+                onViewDrawing={(url) => setViewerUrl(url)} 
+              />
+            </div>
+          )}
+        </main>
+      </div>
 
       {viewerUrl && (
         <DrawingViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />

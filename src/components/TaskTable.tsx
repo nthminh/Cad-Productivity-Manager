@@ -32,30 +32,30 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="min-w-full w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 border-bottom border-slate-200">
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Tên bản vẽ</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Kỹ sư</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Độ khó</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Trạng thái</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Hạn chót</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Năng suất (T/A)</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Theo dõi giờ</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Thao tác</th>
+              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tên bản vẽ</th>
+              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Kỹ sư</th>
+              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Độ khó</th>
+              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Trạng thái</th>
+              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Hạn chót</th>
+              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Năng suất (T/A)</th>
+              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Theo dõi giờ</th>
+              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right whitespace-nowrap">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {tasks.map((task) => (
               <tr key={task.id} className="hover:bg-slate-50/50 transition-colors group">
-                <td className="px-6 py-4">
+                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   <div className="flex flex-col">
                     <span className="font-medium text-slate-900">{task.drawing_name}</span>
                     <span className="text-xs text-slate-500">Dự án ID: {task.project_id.slice(0, 8)}...</span>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-sm text-slate-600">{task.engineer_name}</td>
-                <td className="px-6 py-4">
+                <td className="px-4 md:px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{task.engineer_name}</td>
+                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   <div className="flex gap-0.5">
                     {[...Array(5)].map((_, i) => (
                       <Star 
@@ -66,12 +66,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     ))}
                   </div>
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status)}`}>
                     {task.status}
                   </span>
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   {task.deadline ? (
                     <div className="flex flex-col">
                       <span className={`text-sm font-medium ${
@@ -89,7 +89,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     <span className="text-slate-400 text-xs italic">Chưa đặt</span>
                   )}
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   <div className="flex flex-col">
                     <span className={`text-sm ${getProductivityColor(task.target_hours, task.actual_hours)}`}>
                       {task.actual_hours > 0 ? `${((task.target_hours / task.actual_hours) * 100).toFixed(1)}%` : '-%'}
@@ -99,15 +99,15 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     </span>
                   </div>
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   <Timer 
                     taskId={task.id} 
                     onTimeUpdate={onRefresh} 
                     isRunning={task.status === 'Đang làm'} 
                   />
                 </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-2 relative">
+                <td className="px-4 md:px-6 py-4 text-right whitespace-nowrap">
+                  <div className="flex items-center justify-end gap-1 relative">
                     {task.viewer_link && (
                       <button 
                         onClick={() => onViewDrawing(task.viewer_link!)}
