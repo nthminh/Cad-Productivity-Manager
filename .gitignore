@@ -81,3 +81,7 @@ jspm_packages/
 
 # Stores VSCode state and history
 .vscode-test
+
+# Build output (always rebuild from source before deploying)
+dist/
+dist-server/
