@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, HardHat, User, FileText, Target, Star, Clock, CheckCircle2 } from 'lucide-react';
+import { X, Save, HardHat, User, FileText, Target, Star, Clock, CheckCircle2, DollarSign, Link } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, addDoc } from 'firebase/firestore';
 
@@ -16,6 +16,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
     difficulty: 3,
     target_hours: 8,
     actual_hours: 0,
+    cost: 0,
     status: 'Đang làm',
     drive_link: '',
     viewer_link: '',
@@ -148,10 +149,26 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
               />
             </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                <DollarSign size={14} /> Giá thành (VNĐ)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                value={formData.cost}
+                onChange={e => setFormData({...formData, cost: parseInt(e.target.value, 10) || 0})}
+                placeholder="0"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+              />
+            </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase">Link Google Drive (Bản vẽ/PDF)</label>
+            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <Link size={14} /> Link xem bản vẽ (Viewer)
+            </label>
             <input
               value={formData.viewer_link}
               onChange={e => setFormData({...formData, viewer_link: e.target.value})}
@@ -159,6 +176,18 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
             />
             <p className="text-[10px] text-slate-400 italic">* Lưu ý: Hãy để chế độ "Bất kỳ ai có đường liên kết đều có thể xem"</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <Link size={14} /> Link Google Drive (Folder/File)
+            </label>
+            <input
+              value={formData.drive_link}
+              onChange={e => setFormData({...formData, drive_link: e.target.value})}
+              placeholder="https://drive.google.com/drive/folders/..."
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+            />
           </div>
 
           <div className="pt-4 flex gap-3 flex-shrink-0">

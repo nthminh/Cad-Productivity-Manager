@@ -42,6 +42,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Trạng thái</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Hạn chót</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Năng suất (T/A)</th>
+              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Giá thành</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Theo dõi giờ</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right whitespace-nowrap">Thao tác</th>
             </tr>
@@ -102,6 +103,15 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                       {task.target_hours}h / {task.actual_hours.toFixed(1)}h
                     </span>
                   </div>
+                </td>
+                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                  {task.cost != null && task.cost > 0 ? (
+                    <span className="text-sm font-medium text-slate-700">
+                      {task.cost.toLocaleString('vi-VN')} ₫
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 text-xs italic">Chưa có</span>
+                  )}
                 </td>
                 <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   <Timer 
