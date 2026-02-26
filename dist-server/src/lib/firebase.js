@@ -3,13 +3,14 @@ import { getFirestore } from "firebase/firestore";
 const getFirebaseConfig = () => {
     // Priority 1: Environment Variables (Secrets)
     const envConfig = {
-        apiKey: "AIzaSyAf8Jkx_nDToPSmd4UiJllY-j9AHKjc2gI",
-        authDomain: "cad-pm-19276058-4889e.firebaseapp.com",
-        databaseURL: "https://cad-pm-19276058-4889e-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "cad-pm-19276058-4889e",
-        storageBucket: "cad-pm-19276058-4889e.firebasestorage.app",
-        messagingSenderId: "243255494351",
-        appId: "1:243255494351:web:754b7eb23f44297a77d9ba"
+        apiKey: "AIzaSyCYAcruYx8ee37dfnUle7Djstd0vqhxDs4",
+        authDomain: "cad-productivity-manager.firebaseapp.com",
+        databaseURL: "https://cad-productivity-manager-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "cad-productivity-manager",
+        storageBucket: "cad-productivity-manager.firebasestorage.app",
+        messagingSenderId: "832543652134",
+        appId: "1:832543652134:web:34659e22fab627157a69e7",
+        measurementId: "G-R1N58R71VE"
     };
     if (envConfig.apiKey && envConfig.projectId) {
         return envConfig;
