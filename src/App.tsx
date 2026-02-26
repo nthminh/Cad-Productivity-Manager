@@ -27,6 +27,7 @@ import { DrawingViewer } from './components/DrawingViewer';
 import { TaskForm } from './components/TaskForm';
 import { EngineerList } from './components/EngineerList';
 import { SalaryPage } from './components/SalaryPage';
+import { ReportsPage } from './components/ReportsPage';
 import { db, isFirebaseConfigured } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { Task } from './types/database.types';
@@ -74,6 +75,10 @@ export default function App() {
   const totalActualHours = tasks.reduce((acc, t) => acc + t.actual_hours, 0);
   const totalTargetHours = tasks.reduce((acc, t) => acc + t.target_hours, 0);
   const avgProductivity = totalActualHours > 0 ? (totalTargetHours / totalActualHours) * 100 : 0;
+  const now = new Date();
+  const overdueTaskCount = tasks.filter(
+    t => t.deadline && new Date(t.deadline) < now && t.status !== 'Hoàn thành'
+  ).length;
 
   const chartData = tasks.slice(0, 7).map(t => ({
     name: t.drawing_name.length > 10 ? t.drawing_name.slice(0, 10) + '...' : t.drawing_name,
@@ -104,7 +109,8 @@ export default function App() {
                 {activeTab === 'dashboard' ? 'Tổng quan' : 
                  activeTab === 'tasks' ? 'Quản lý dự án' :
                  activeTab === 'engineers' ? 'Danh sách kỹ sư' :
-                 'Tính lương'}
+                 activeTab === 'salary' ? 'Tính lương' :
+                 'Báo cáo'}
               </h2>
               <p className="text-slate-500 mt-1 text-xs lg:text-base hidden sm:block">
                 {activeTab === 'dashboard' 
@@ -113,7 +119,9 @@ export default function App() {
                   ? 'Danh sách chi tiết các nhiệm vụ và tiến độ.'
                   : activeTab === 'engineers'
                   ? 'Quản lý thông tin kỹ sư và nhân viên.'
-                  : 'Quản lý lương căn bản và lương theo dự án.'}
+                  : activeTab === 'salary'
+                  ? 'Quản lý lương căn bản và lương theo dự án.'
+                  : 'Thống kê và phân tích hiệu suất toàn đội.'}
               </p>
             </div>
           </div>
@@ -148,6 +156,8 @@ export default function App() {
             <EngineerList />
           ) : activeTab === 'salary' ? (
             <SalaryPage />
+          ) : activeTab === 'reports' ? (
+            <ReportsPage />
           ) : activeTab === 'dashboard' ? (
             <div className="space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
@@ -176,6 +186,20 @@ export default function App() {
                   color={avgProductivity > 100 ? 'emerald' : avgProductivity < 80 ? 'rose' : 'blue'}
                 />
               </div>
+              {overdueTaskCount > 0 && (
+                <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-700">
+                  <AlertCircle size={20} className="flex-shrink-0" />
+                  <p className="text-sm font-medium">
+                    Có <span className="font-bold">{overdueTaskCount}</span> dự án đã quá hạn và chưa hoàn thành.
+                    <button
+                      onClick={() => setActiveTab('tasks')}
+                      className="ml-2 underline font-semibold hover:text-rose-900 transition-colors"
+                    >
+                      Xem ngay →
+                    </button>
+                  </p>
+                </div>
+              )}
 
               <div className="bg-white p-4 lg:p-8 rounded-2xl border border-slate-200 shadow-sm">
                 <h3 className="text-base lg:text-lg font-bold text-slate-900 flex items-center gap-2 mb-6">

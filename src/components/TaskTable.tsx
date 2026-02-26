@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ExternalLink, Eye, MoreVertical, Star, Download } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ExternalLink, Eye, MoreVertical, Star, Download, Search, Filter, FileDown, X } from 'lucide-react';
 import { Task } from '../types/database.types';
 import { TaskContextMenu } from './TaskContextMenu';
 import { EditTaskForm } from './EditTaskForm';
@@ -45,9 +45,62 @@ interface TaskTableProps {
   onViewDrawing: (link: string) => void;
 }
 
+function exportToCSV(tasks: Task[]) {
+  const headers = [
+    'Tên dự án', 'Kỹ sư', 'Độ khó', 'Trạng thái', 'Hạn chót',
+    'Giờ mục tiêu', 'Giờ thực tế', 'Năng suất (%)', 'Giá thành (VNĐ)', 'Ngày tạo',
+  ];
+  const rows = tasks.map(t => [
+    t.drawing_name,
+    t.engineer_name,
+    t.difficulty,
+    t.status,
+    t.deadline ?? '',
+    t.target_hours,
+    t.actual_hours.toFixed(1),
+    t.actual_hours > 0 ? ((t.target_hours / t.actual_hours) * 100).toFixed(1) : '',
+    t.cost ?? 0,
+    new Date(t.created_at).toLocaleDateString('vi-VN'),
+  ]);
+  const csvContent = [headers, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `cad-tasks-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDrawing }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [search, setSearch] = useState('');
+  const [filterEngineer, setFilterEngineer] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+
+  const uniqueEngineers = useMemo(
+    () => Array.from(new Set(tasks.map(t => t.engineer_name))).sort(),
+    [tasks]
+  );
+
+  const filteredTasks = tasks.filter(t => {
+    const matchSearch = search === '' || t.drawing_name.toLowerCase().includes(search.toLowerCase());
+    const matchEngineer = filterEngineer === '' || t.engineer_name === filterEngineer;
+    const matchStatus = filterStatus === '' || t.status === filterStatus;
+    return matchSearch && matchEngineer && matchStatus;
+  });
+
+  const hasActiveFilters = search !== '' || filterEngineer !== '' || filterStatus !== '';
+
+  const clearFilters = () => {
+    setSearch('');
+    setFilterEngineer('');
+    setFilterStatus('');
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Đang làm': return 'bg-blue-100 text-blue-700 border-blue-200';
@@ -66,6 +119,70 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
   };
 
   return (
+    <div className="space-y-4">
+      {/* Filter Bar */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input
+              type="text"
+              placeholder="Tìm theo tên dự án..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all"
+            />
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <div className="relative">
+              <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+              <select
+                value={filterEngineer}
+                onChange={e => setFilterEngineer(e.target.value)}
+                className="pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all appearance-none"
+              >
+                <option value="">Tất cả kỹ sư</option>
+                {uniqueEngineers.map(eng => (
+                  <option key={eng} value={eng}>{eng}</option>
+                ))}
+              </select>
+            </div>
+            <select
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all appearance-none"
+            >
+              <option value="">Tất cả trạng thái</option>
+              <option value="Đang làm">Đang làm</option>
+              <option value="Chờ duyệt">Chờ duyệt</option>
+              <option value="Hoàn thành">Hoàn thành</option>
+            </select>
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl text-sm font-medium transition-colors"
+              >
+                <X size={14} />
+                Xóa lọc
+              </button>
+            )}
+            <button
+              onClick={() => exportToCSV(filteredTasks)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-sm font-medium transition-colors"
+              title="Xuất CSV"
+            >
+              <FileDown size={16} />
+              <span className="hidden sm:inline">Xuất CSV</span>
+            </button>
+          </div>
+        </div>
+        {hasActiveFilters && (
+          <p className="mt-2 text-xs text-slate-500">
+            Hiển thị {filteredTasks.length} / {tasks.length} dự án
+          </p>
+        )}
+      </div>
+
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full w-full text-left border-collapse">
@@ -85,7 +202,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {tasks.map((task) => (
+            {filteredTasks.length === 0 && (
+              <tr>
+                <td colSpan={11} className="px-6 py-10 text-center text-slate-400 text-sm">
+                  {hasActiveFilters ? 'Không tìm thấy dự án phù hợp với bộ lọc.' : 'Chưa có dự án nào.'}
+                </td>
+              </tr>
+            )}
+            {filteredTasks.map((task) => (
               <tr key={task.id} className="hover:bg-slate-50/50 transition-colors group">
                 <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   <span className="font-medium text-slate-900">{task.drawing_name}</span>
@@ -220,6 +344,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
           onSuccess={() => { setEditTask(null); onRefresh(); }}
         />
       )}
+    </div>
     </div>
   );
 };
