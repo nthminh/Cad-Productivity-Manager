@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ClipboardList, Settings, LogOut, HardHat, X } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, LogOut, HardHat, X } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -28,19 +28,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
 
   return (
     <>
-      {/* Overlay for mobile */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-black/60 z-30 lg:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
+          aria-hidden="true"
         ></div>
       )}
 
       <aside 
         className={cn(
-          "bg-slate-900 text-slate-300 flex flex-col h-screen border-r border-slate-800 transition-transform duration-300 ease-in-out",
-          "fixed lg:sticky top-0 z-40",
-          "w-64", // Default width for desktop
+          "fixed top-0 left-0 z-40 w-64 h-screen bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800",
+          "transition-transform duration-300 ease-in-out",
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
@@ -65,7 +64,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
               key={item.id}
               onClick={() => {
                 setActiveTab(item.id);
-                setIsMobileMenuOpen(false); // Close mobile menu on tab change
+                setIsMobileMenuOpen(false);
               }}
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",

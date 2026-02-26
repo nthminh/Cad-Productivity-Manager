@@ -8,7 +8,7 @@ import {
   Search, 
   TrendingUp,
   AlertCircle,
-  Menu // Import the Menu icon
+  Menu
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -80,7 +80,7 @@ export default function App() {
   }));
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
@@ -88,7 +88,7 @@ export default function App() {
         setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
-      <div className="flex-1 flex flex-col">
+      <div className="lg:pl-64 flex-1 flex flex-col">
         <header className="flex items-center justify-between p-4 lg:p-8 bg-slate-50/80 backdrop-blur-sm sticky top-0 z-20 border-b border-slate-200">
           <div className="flex items-center gap-4">
             <button 

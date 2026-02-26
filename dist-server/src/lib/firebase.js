@@ -3,12 +3,13 @@ import { getFirestore } from "firebase/firestore";
 const getFirebaseConfig = () => {
     // Priority 1: Environment Variables (Secrets)
     const envConfig = {
-        apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-        appId: import.meta.env.VITE_FIREBASE_APP_ID
+        apiKey: "AIzaSyAf8Jkx_nDToPSmd4UiJllY-j9AHKjc2gI",
+        authDomain: "cad-pm-19276058-4889e.firebaseapp.com",
+        databaseURL: "https://cad-pm-19276058-4889e-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "cad-pm-19276058-4889e",
+        storageBucket: "cad-pm-19276058-4889e.firebasestorage.app",
+        messagingSenderId: "243255494351",
+        appId: "1:243255494351:web:754b7eb23f44297a77d9ba"
     };
     if (envConfig.apiKey && envConfig.projectId) {
         return envConfig;
