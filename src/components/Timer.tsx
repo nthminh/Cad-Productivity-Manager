@@ -3,6 +3,13 @@ import { Play, Square, Timer as TimerIcon } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, addDoc, updateDoc, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 
+const ACTIVE_TIMER_KEY = 'active_timer';
+
+interface ActiveTimer {
+  taskId: string;
+  logId: string;
+}
+
 interface TimerProps {
   taskId: string;
   onTimeUpdate: () => void;
@@ -14,6 +21,33 @@ export const Timer: React.FC<TimerProps> = ({ taskId, onTimeUpdate, isRunning: i
   const [seconds, setSeconds] = useState(0);
   const [activeLogId, setActiveLogId] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Restore timer state from localStorage/Firestore on mount
+  useEffect(() => {
+    const restore = async () => {
+      if (!db) return;
+      try {
+        const stored = localStorage.getItem(ACTIVE_TIMER_KEY);
+        if (!stored) return;
+        const active: ActiveTimer = JSON.parse(stored);
+        if (active.taskId !== taskId) return;
+
+        const logRef = doc(db, 'time_logs', active.logId);
+        const logSnap = await getDoc(logRef);
+        if (!logSnap.exists() || logSnap.data().end_time) return;
+
+        const start = new Date(logSnap.data().start_time).getTime();
+        const elapsed = Math.floor((Date.now() - start) / 1000);
+
+        setActiveLogId(active.logId);
+        setSeconds(elapsed);
+        setIsRunning(true);
+      } catch (e) {
+        console.error('Error restoring timer:', e);
+      }
+    };
+    restore();
+  }, [taskId, db]);
 
   useEffect(() => {
     if (isRunning) {
@@ -36,7 +70,7 @@ export const Timer: React.FC<TimerProps> = ({ taskId, onTimeUpdate, isRunning: i
   };
 
   const handleStart = async () => {
-    if (!db) return;
+    if (!db || isRunning) return;
     try {
       const startTime = new Date().toISOString();
       const docRef = await addDoc(collection(db, "time_logs"), {
@@ -46,7 +80,11 @@ export const Timer: React.FC<TimerProps> = ({ taskId, onTimeUpdate, isRunning: i
         duration: null
       });
 
+      const active: ActiveTimer = { taskId, logId: docRef.id };
+      localStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify(active));
+
       setActiveLogId(docRef.id);
+      setSeconds(0);
       setIsRunning(true);
       
       // Update task status
@@ -86,6 +124,8 @@ export const Timer: React.FC<TimerProps> = ({ taskId, onTimeUpdate, isRunning: i
         const totalHours = totalSeconds / 3600;
         const taskRef = doc(db, "tasks", taskId);
         await updateDoc(taskRef, { actual_hours: totalHours });
+
+        localStorage.removeItem(ACTIVE_TIMER_KEY);
 
         setIsRunning(false);
         setSeconds(0);

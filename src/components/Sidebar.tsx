@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ClipboardList, LogOut, HardHat, X } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, HardHat, X } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -19,12 +19,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'tasks', label: 'Quản lý Task', icon: ClipboardList },
   ];
-
-  const handleLogout = () => {
-    if (!window.confirm('Bạn có chắc muốn đăng xuất? Cấu hình Firebase sẽ bị xóa.')) return;
-    localStorage.removeItem('firebase_config');
-    window.location.reload();
-  };
 
   return (
     <>
@@ -84,13 +78,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
             </button>
           ))}
         </nav>
-
-        <div className="p-4 border-t border-slate-800">
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-200">
-            <LogOut size={20} />
-            Đăng xuất
-          </button>
-        </div>
       </aside>
     </>
   );
