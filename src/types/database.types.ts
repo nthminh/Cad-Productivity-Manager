@@ -10,6 +10,7 @@ export type Task = {
   project_id: string;
   engineer_name: string;
   drawing_name: string;
+  description: string | null;
   difficulty: number;
   target_hours: number;
   actual_hours: number;
