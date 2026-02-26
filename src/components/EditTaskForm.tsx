@@ -1,33 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, HardHat, User, FileText, Target, Star, Clock, CheckCircle2, DollarSign, Link, AlignLeft, ChevronDown } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, addDoc, query, orderBy, getDocs } from 'firebase/firestore';
-import { Engineer } from '../types/database.types';
+import { collection, doc, updateDoc, query, orderBy, getDocs } from 'firebase/firestore';
+import { Task, Engineer } from '../types/database.types';
 
-interface TaskFormProps {
+interface EditTaskFormProps {
+  task: Task;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
-  const initialFormData = {
-    drawing_name: '',
-    engineer_name: '',
-    description: '',
-    project_id: 'default-project',
-    difficulty: 3,
-    target_hours: 8,
-    actual_hours: 0,
-    cost: 0,
-    status: 'Đang làm',
-    drive_link: '',
-    viewer_link: '',
-    deadline: '',
-  };
-
-  const [formData, setFormData] = useState(initialFormData);
+export const EditTaskForm: React.FC<EditTaskFormProps> = ({ task, onClose, onSuccess }) => {
+  const [formData, setFormData] = useState({
+    drawing_name: task.drawing_name,
+    engineer_name: task.engineer_name,
+    description: task.description ?? '',
+    project_id: task.project_id,
+    difficulty: task.difficulty,
+    target_hours: task.target_hours,
+    actual_hours: task.actual_hours,
+    cost: task.cost ?? 0,
+    status: task.status,
+    drive_link: task.drive_link ?? '',
+    viewer_link: task.viewer_link ?? '',
+    deadline: task.deadline ?? '',
+  });
   const [engineers, setEngineers] = useState<Engineer[]>([]);
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -51,20 +49,15 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!db) return;
-    
     setLoading(true);
     setError(null);
     try {
-      await addDoc(collection(db, "tasks"), {
-        ...formData,
-        created_at: new Date().toISOString()
-      });
-      setFormData(initialFormData);
+      await updateDoc(doc(db, 'tasks', task.id), { ...formData });
       onSuccess();
       setSuccess(true);
     } catch (err) {
-      console.error("Error adding task:", err);
-      setError("Có lỗi xảy ra khi thêm task. Vui lòng thử lại.");
+      console.error('Error updating task:', err);
+      setError('Có lỗi xảy ra khi cập nhật task. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
@@ -75,10 +68,10 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
       <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
         <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="bg-emerald-500 p-2 rounded-lg">
+            <div className="bg-blue-500 p-2 rounded-lg">
               <HardHat className="text-white" size={20} />
             </div>
-            <h2 className="font-bold text-slate-900 text-lg">Thêm dự án mới</h2>
+            <h2 className="font-bold text-slate-900 text-lg">Chỉnh sửa dự án</h2>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-rose-500 transition-colors">
             <X size={24} />
@@ -87,14 +80,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
 
         <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6 overflow-y-auto">
           {error && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700 font-medium">
-              {error}
-            </div>
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700 font-medium">{error}</div>
           )}
           {success && (
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 font-medium flex items-center gap-2">
               <CheckCircle2 size={16} />
-              Thêm dự án thành công!
+              Cập nhật thành công!
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -106,8 +97,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
                 required
                 value={formData.drawing_name}
                 onChange={e => setFormData({...formData, drawing_name: e.target.value})}
-                placeholder="Ví dụ: MB-TANG-01.dwg"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
               />
             </div>
             <div className="space-y-1.5">
@@ -120,7 +110,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
                     required
                     value={formData.engineer_name}
                     onChange={e => setFormData({...formData, engineer_name: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all appearance-none pr-10"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none pr-10"
                   >
                     <option value="">-- Chọn kỹ sư --</option>
                     {engineers.map(eng => (
@@ -134,8 +124,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
                   required
                   value={formData.engineer_name}
                   onChange={e => setFormData({...formData, engineer_name: e.target.value})}
-                  placeholder="Tên kỹ sư"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
                 />
               )}
             </div>
@@ -150,7 +139,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
                 step="0.5"
                 value={formData.target_hours}
                 onChange={e => setFormData({...formData, target_hours: parseFloat(e.target.value)})}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
               />
             </div>
             <div className="space-y-1.5">
@@ -160,7 +149,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
               <select
                 value={formData.difficulty}
                 onChange={e => setFormData({...formData, difficulty: parseInt(e.target.value)})}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
               >
                 {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v} Sao</option>)}
               </select>
@@ -173,7 +162,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
                 type="date"
                 value={formData.deadline}
                 onChange={e => setFormData({...formData, deadline: e.target.value})}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
               />
             </div>
             <div className="space-y-1.5">
@@ -186,8 +175,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
                 step="1000"
                 value={formData.cost}
                 onChange={e => setFormData({...formData, cost: parseInt(e.target.value, 10) || 0})}
-                placeholder="0"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
               />
             </div>
           </div>
@@ -199,9 +187,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
             <textarea
               value={formData.description}
               onChange={e => setFormData({...formData, description: e.target.value})}
-              placeholder="Nhập thông tin cơ bản của dự án (mô tả, yêu cầu, ghi chú...)"
               rows={4}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all resize-none"
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none"
             />
           </div>
 
@@ -213,9 +200,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
               value={formData.viewer_link}
               onChange={e => setFormData({...formData, viewer_link: e.target.value})}
               placeholder="https://drive.google.com/file/d/..."
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
             />
-            <p className="text-[10px] text-slate-400 italic">* Lưu ý: Hãy để chế độ "Bất kỳ ai có đường liên kết đều có thể xem"</p>
           </div>
 
           <div className="space-y-1.5">
@@ -226,7 +212,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
               value={formData.drive_link}
               onChange={e => setFormData({...formData, drive_link: e.target.value})}
               placeholder="https://drive.google.com/drive/folders/..."
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
             />
           </div>
 
@@ -241,10 +227,10 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+              className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-500/20 active:scale-95"
             >
               <Save size={20} />
-              {loading ? 'Đang lưu...' : 'Lưu dự án'}
+              {loading ? 'Đang lưu...' : 'Cập nhật'}
             </button>
           </div>
         </form>

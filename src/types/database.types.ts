@@ -29,3 +29,13 @@ export type TimeLog = {
   end_time: string | null;
   duration: number | null; // in seconds
 };
+
+export type Engineer = {
+  id: string;
+  full_name: string;
+  date_of_birth: string | null;
+  position: string;
+  photo_url: string | null;
+  basic_salary: number;
+  created_at: string;
+};

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ExternalLink, Eye, MoreVertical, Star } from 'lucide-react';
+import { ExternalLink, Eye, MoreVertical, Star, Download } from 'lucide-react';
 import { Task } from '../types/database.types';
 import { TaskContextMenu } from './TaskContextMenu';
+import { EditTaskForm } from './EditTaskForm';
 import { db } from '../lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 
@@ -46,6 +47,7 @@ interface TaskTableProps {
 
 export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDrawing }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [editTask, setEditTask] = useState<Task | null>(null);
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Đang làm': return 'bg-blue-100 text-blue-700 border-blue-200';
@@ -78,6 +80,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Năng suất (T/A)</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Giá thành</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Giờ thực tế</th>
+              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tải về</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right whitespace-nowrap">Thao tác</th>
             </tr>
           </thead>
@@ -150,6 +153,22 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                 <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   <ActualHoursInput task={task} onRefresh={onRefresh} />
                 </td>
+                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                  {task.drive_link ? (
+                    <a
+                      href={task.drive_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-medium transition-colors"
+                      title="Tải file từ Drive"
+                    >
+                      <Download size={14} />
+                      Tải về
+                    </a>
+                  ) : (
+                    <span className="text-slate-400 text-xs italic">Chưa có</span>
+                  )}
+                </td>
                 <td className="px-4 md:px-6 py-4 text-right whitespace-nowrap">
                   <div className="flex items-center justify-end gap-1 relative">
                     {task.viewer_link && (
@@ -183,6 +202,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                         task={task}
                         onClose={() => setOpenMenuId(null)}
                         onRefresh={onRefresh}
+                        onEdit={(t) => { setEditTask(t); setOpenMenuId(null); }}
                       />
                     )}
                   </div>
@@ -192,6 +212,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
           </tbody>
         </table>
       </div>
+
+      {editTask && (
+        <EditTaskForm
+          task={editTask}
+          onClose={() => setEditTask(null)}
+          onSuccess={() => { setEditTask(null); onRefresh(); }}
+        />
+      )}
     </div>
   );
 };
