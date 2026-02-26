@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, HardHat, User, FileText, Target, Star, Clock, CheckCircle2, DollarSign, Link } from 'lucide-react';
+import { X, Save, HardHat, User, FileText, Target, Star, Clock, CheckCircle2, DollarSign, Link, AlignLeft } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, addDoc } from 'firebase/firestore';
 
@@ -12,6 +12,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
   const initialFormData = {
     drawing_name: '',
     engineer_name: '',
+    description: '',
     project_id: 'default-project',
     difficulty: 3,
     target_hours: 8,
@@ -163,6 +164,19 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
               />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <AlignLeft size={14} /> Thông tin dự án
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={e => setFormData({...formData, description: e.target.value})}
+              placeholder="Nhập thông tin cơ bản của dự án (mô tả, yêu cầu, ghi chú...)"
+              rows={4}
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all resize-none"
+            />
           </div>
 
           <div className="space-y-1.5">

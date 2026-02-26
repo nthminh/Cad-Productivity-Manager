@@ -1,8 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ExternalLink, Eye, MoreVertical, Star } from 'lucide-react';
 import { Task } from '../types/database.types';
-import { Timer } from './Timer';
 import { TaskContextMenu } from './TaskContextMenu';
+import { db } from '../lib/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+
+function ActualHoursInput({ task, onRefresh }: { task: Task; onRefresh: () => void }) {
+  const [value, setValue] = useState(String(task.actual_hours ?? 0));
+
+  useEffect(() => {
+    setValue(String(task.actual_hours ?? 0));
+  }, [task.actual_hours]);
+
+  const handleSave = async () => {
+    if (!db) return;
+    const hours = parseFloat(value) || 0;
+    if (hours === task.actual_hours) return;
+    try {
+      await updateDoc(doc(db, 'tasks', task.id), { actual_hours: hours });
+      onRefresh();
+    } catch (e) {
+      console.error('Error updating actual hours:', e);
+    }
+  };
+
+  return (
+    <input
+      type="number"
+      min="0"
+      step="0.5"
+      value={value}
+      onChange={e => setValue(e.target.value)}
+      onBlur={handleSave}
+      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+      className="w-24 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+    />
+  );
+}
 
 interface TaskTableProps {
   tasks: Task[];
@@ -43,7 +77,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Hạn chót</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Năng suất (T/A)</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Giá thành</th>
-              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Theo dõi giờ</th>
+              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Giờ thực tế</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right whitespace-nowrap">Thao tác</th>
             </tr>
           </thead>
@@ -114,11 +148,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                   )}
                 </td>
                 <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                  <Timer 
-                    taskId={task.id} 
-                    onTimeUpdate={onRefresh} 
-                    isRunning={task.status === 'Đang làm'} 
-                  />
+                  <ActualHoursInput task={task} onRefresh={onRefresh} />
                 </td>
                 <td className="px-4 md:px-6 py-4 text-right whitespace-nowrap">
                   <div className="flex items-center justify-end gap-1 relative">
