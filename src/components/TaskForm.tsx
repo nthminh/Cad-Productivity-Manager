@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Save, HardHat, User, FileText, Target, Star, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Save, HardHat, User, FileText, Target, Star, Clock, CheckCircle2 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, addDoc } from 'firebase/firestore';
 
@@ -9,7 +9,7 @@ interface TaskFormProps {
 }
 
 export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
-  const [formData, setFormData] = useState({
+  const initialFormData = {
     drawing_name: '',
     engineer_name: '',
     project_id: 'default-project',
@@ -20,25 +20,40 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
     drive_link: '',
     viewer_link: '',
     deadline: '',
-  });
+  };
+
+  const [formData, setFormData] = useState(initialFormData);
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => {
+      setSuccess(false);
+      onClose();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [success, onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!db) return;
     
     setLoading(true);
+    setError(null);
     try {
       await addDoc(collection(db, "tasks"), {
         ...formData,
         created_at: new Date().toISOString()
       });
+      setFormData(initialFormData);
       onSuccess();
-      onClose();
-    } catch (error) {
-      console.error("Error adding task:", error);
-      alert("Có lỗi xảy ra khi thêm task.");
+      setSuccess(true);
+    } catch (err) {
+      console.error("Error adding task:", err);
+      setError("Có lỗi xảy ra khi thêm task. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -60,6 +75,17 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          {error && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700 font-medium">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 font-medium flex items-center gap-2">
+              <CheckCircle2 size={16} />
+              Thêm bản vẽ thành công!
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">

@@ -20,6 +20,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     { id: 'settings', label: 'Cài đặt', icon: Settings },
   ];
 
+  const handleLogout = () => {
+    if (!window.confirm('Bạn có chắc muốn đăng xuất? Cấu hình Firebase sẽ bị xóa.')) return;
+    localStorage.removeItem('firebase_config');
+    window.location.reload();
+  };
+
   return (
     <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col h-screen sticky top-0 border-r border-slate-800">
       <div className="p-6 flex items-center gap-3 border-b border-slate-800">
@@ -57,7 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
       </nav>
 
       <div className="p-4 border-t border-slate-800">
-        <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-200">
+        <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-200">
           <LogOut size={20} />
           Đăng xuất
         </button>

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ExternalLink, Eye, MoreVertical, Star } from 'lucide-react';
 import { Task } from '../types/database.types';
 import { Timer } from './Timer';
+import { TaskContextMenu } from './TaskContextMenu';
 
 interface TaskTableProps {
   tasks: Task[];
@@ -10,6 +11,7 @@ interface TaskTableProps {
 }
 
 export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDrawing }) => {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Đang làm': return 'bg-blue-100 text-blue-700 border-blue-200';
@@ -105,7 +107,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                   />
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="flex items-center justify-end gap-2 relative">
                     {task.viewer_link && (
                       <button 
                         onClick={() => onViewDrawing(task.viewer_link!)}
@@ -126,9 +128,19 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                         <ExternalLink size={18} />
                       </a>
                     )}
-                    <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                    <button 
+                      onClick={() => setOpenMenuId(openMenuId === task.id ? null : task.id)}
+                      className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
                       <MoreVertical size={18} />
                     </button>
+                    {openMenuId === task.id && (
+                      <TaskContextMenu
+                        task={task}
+                        onClose={() => setOpenMenuId(null)}
+                        onRefresh={onRefresh}
+                      />
+                    )}
                   </div>
                 </td>
               </tr>
