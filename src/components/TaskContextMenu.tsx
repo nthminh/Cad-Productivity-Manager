@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Trash2, CheckCircle, Clock, RefreshCw } from 'lucide-react';
+import { Trash2, CheckCircle, Clock, RefreshCw, Pencil } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { Task } from '../types/database.types';
@@ -8,9 +8,10 @@ interface TaskContextMenuProps {
   task: Task;
   onClose: () => void;
   onRefresh: () => void;
+  onEdit: (task: Task) => void;
 }
 
-export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose, onRefresh }) => {
+export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose, onRefresh, onEdit }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,6 +55,14 @@ export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose,
       className="absolute right-0 mt-1 w-52 bg-white rounded-xl border border-slate-200 shadow-lg z-50 overflow-hidden"
     >
       <div className="py-1">
+        <button
+          onClick={() => { onEdit(task); onClose(); }}
+          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+        >
+          <Pencil size={16} />
+          Chỉnh sửa
+        </button>
+        <div className="my-1 border-t border-slate-100" />
         {task.status !== 'Hoàn thành' && (
           <button
             onClick={() => handleStatusChange('Hoàn thành')}

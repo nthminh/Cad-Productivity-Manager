@@ -25,6 +25,8 @@ import { StatCard } from './components/StatCard';
 import { TaskTable } from './components/TaskTable';
 import { DrawingViewer } from './components/DrawingViewer';
 import { TaskForm } from './components/TaskForm';
+import { EngineerList } from './components/EngineerList';
+import { SalaryPage } from './components/SalaryPage';
 import { db, isFirebaseConfigured } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { Task } from './types/database.types';
@@ -99,12 +101,19 @@ export default function App() {
             </button>
             <div>
               <h2 className="text-xl lg:text-3xl font-bold text-slate-900 tracking-tight">
-                {activeTab === 'dashboard' ? 'Tổng quan' : 'Quản lý dự án'}
+                {activeTab === 'dashboard' ? 'Tổng quan' : 
+                 activeTab === 'tasks' ? 'Quản lý dự án' :
+                 activeTab === 'engineers' ? 'Danh sách kỹ sư' :
+                 'Tính lương'}
               </h2>
               <p className="text-slate-500 mt-1 text-xs lg:text-base hidden sm:block">
                 {activeTab === 'dashboard' 
                   ? 'Theo dõi các chỉ số hiệu quả công việc.' 
-                  : 'Danh sách chi tiết các nhiệm vụ và tiến độ.'}
+                  : activeTab === 'tasks'
+                  ? 'Danh sách chi tiết các nhiệm vụ và tiến độ.'
+                  : activeTab === 'engineers'
+                  ? 'Quản lý thông tin kỹ sư và nhân viên.'
+                  : 'Quản lý lương căn bản và lương theo dự án.'}
               </p>
             </div>
           </div>
@@ -135,7 +144,11 @@ export default function App() {
             </div>
           )}
 
-          {activeTab === 'dashboard' ? (
+          {activeTab === 'engineers' ? (
+            <EngineerList />
+          ) : activeTab === 'salary' ? (
+            <SalaryPage />
+          ) : activeTab === 'dashboard' ? (
             <div className="space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                 <StatCard 
