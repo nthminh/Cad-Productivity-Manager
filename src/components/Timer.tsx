@@ -36,6 +36,7 @@ export const Timer: React.FC<TimerProps> = ({ taskId, onTimeUpdate, isRunning: i
   };
 
   const handleStart = async () => {
+    if (!db) return;
     try {
       const startTime = new Date().toISOString();
       const docRef = await addDoc(collection(db, "time_logs"), {
