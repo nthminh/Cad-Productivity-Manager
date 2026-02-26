@@ -46,7 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
               <HardHat className="text-white" size={24} />
             </div>
             <div>
-              <h1 className="text-white font-bold text-lg leading-tight">CAD Pro</h1>
+              <h1 className="text-white font-bold text-lg leading-tight">PM</h1>
               <p className="text-xs text-slate-500">Productivity Manager</p>
             </div>
           </div>
