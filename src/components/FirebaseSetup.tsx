@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Save, AlertCircle, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Database, Save, AlertCircle, CheckCircle2, ShieldAlert, Code2 } from 'lucide-react';
+import { isHardcodedConfigActive } from '../lib/firebase';
 
 interface FirebaseConfig {
   apiKey: string;
@@ -46,6 +47,15 @@ export const FirebaseSetup: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      {isHardcodedConfigActive && (
+        <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl flex gap-3 text-emerald-800">
+          <Code2 className="shrink-0" size={20} />
+          <div className="text-sm">
+            <p className="font-bold">Cấu hình đã được nhúng sẵn trong code</p>
+            <p>Firebase đang dùng cấu hình được nhúng trực tiếp trong mã nguồn (<code className="bg-emerald-100 px-1 rounded">src/lib/firebase.ts</code>). Tất cả người dùng chia sẻ cùng một database mà không cần cài đặt thêm.</p>
+          </div>
+        </div>
+      )}
       <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex gap-3 text-amber-800">
         <ShieldAlert className="shrink-0" size={20} />
         <div className="text-sm">
