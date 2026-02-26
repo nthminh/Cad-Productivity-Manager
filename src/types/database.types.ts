@@ -13,6 +13,7 @@ export type Task = {
   difficulty: number;
   target_hours: number;
   actual_hours: number;
+  cost: number | null;
   status: 'Đang làm' | 'Chờ duyệt' | 'Hoàn thành';
   drive_link: string | null;
   viewer_link: string | null;

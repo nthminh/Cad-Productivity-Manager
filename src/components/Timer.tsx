@@ -21,27 +21,43 @@ export const Timer: React.FC<TimerProps> = ({ taskId, onTimeUpdate, isRunning: i
   const [seconds, setSeconds] = useState(0);
   const [activeLogId, setActiveLogId] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number | null>(null);
 
-  // Restore timer state from localStorage/Firestore on mount
+  // Restore timer state from Firestore on mount (cross-device compatible)
   useEffect(() => {
     const restore = async () => {
       if (!db) return;
       try {
-        const stored = localStorage.getItem(ACTIVE_TIMER_KEY);
-        if (!stored) return;
-        const active: ActiveTimer = JSON.parse(stored);
-        if (active.taskId !== taskId) return;
+        // Query Firestore directly for an active (unfinished) time log for this task
+        const q = query(
+          collection(db, 'time_logs'),
+          where('task_id', '==', taskId),
+          where('end_time', '==', null)
+        );
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) {
+          // Clean up stale localStorage entry if present
+          const stored = localStorage.getItem(ACTIVE_TIMER_KEY);
+          if (stored) {
+            try {
+              const active: ActiveTimer = JSON.parse(stored);
+              if (active.taskId === taskId) localStorage.removeItem(ACTIVE_TIMER_KEY);
+            } catch (_) {}
+          }
+          return;
+        }
 
-        const logRef = doc(db, 'time_logs', active.logId);
-        const logSnap = await getDoc(logRef);
-        if (!logSnap.exists() || logSnap.data().end_time) return;
+        const logDoc = snapshot.docs[0];
+        const startMs = new Date(logDoc.data().start_time).getTime();
+        const elapsed = Math.floor((Date.now() - startMs) / 1000);
 
-        const start = new Date(logSnap.data().start_time).getTime();
-        const elapsed = Math.floor((Date.now() - start) / 1000);
-
-        setActiveLogId(active.logId);
+        startTimeRef.current = startMs;
+        setActiveLogId(logDoc.id);
         setSeconds(elapsed);
         setIsRunning(true);
+
+        // Sync localStorage so other tabs on the same device also know
+        localStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify({ taskId, logId: logDoc.id }));
       } catch (e) {
         console.error('Error restoring timer:', e);
       }
@@ -49,10 +65,13 @@ export const Timer: React.FC<TimerProps> = ({ taskId, onTimeUpdate, isRunning: i
     restore();
   }, [taskId, db]);
 
+  // Tick: recalculate from start_time each second to avoid drift
   useEffect(() => {
     if (isRunning) {
       timerRef.current = setInterval(() => {
-        setSeconds((prev) => prev + 1);
+        if (startTimeRef.current !== null) {
+          setSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
+        }
       }, 1000);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -83,6 +102,7 @@ export const Timer: React.FC<TimerProps> = ({ taskId, onTimeUpdate, isRunning: i
       const active: ActiveTimer = { taskId, logId: docRef.id };
       localStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify(active));
 
+      startTimeRef.current = new Date(startTime).getTime();
       setActiveLogId(docRef.id);
       setSeconds(0);
       setIsRunning(true);
@@ -127,6 +147,7 @@ export const Timer: React.FC<TimerProps> = ({ taskId, onTimeUpdate, isRunning: i
 
         localStorage.removeItem(ACTIVE_TIMER_KEY);
 
+        startTimeRef.current = null;
         setIsRunning(false);
         setSeconds(0);
         setActiveLogId(null);
