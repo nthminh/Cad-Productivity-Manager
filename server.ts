@@ -12,7 +12,7 @@ async function startServer() {
 
   // API routes
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", message: "CAD Productivity Manager API is running" });
+    res.json({ status: "ok", message: "PM - Productivity Manager API is running" });
   });
 
   // Vite middleware for development
