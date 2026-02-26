@@ -106,9 +106,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
       case 'Đang làm': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'Chờ duyệt': return 'bg-amber-100 text-amber-700 border-amber-200';
       case 'Hoàn thành': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      case 'Đã hủy': return 'bg-rose-100 text-rose-700 border-rose-200';
+      case 'Tạm hoãn': return 'bg-slate-100 text-slate-600 border-slate-200';
       default: return 'bg-slate-100 text-slate-700 border-slate-200';
     }
   };
+
+  const isInactiveStatus = (status: string) =>
+    status === 'Hoàn thành' || status === 'Đã hủy' || status === 'Tạm hoãn';
 
   const getProductivityColor = (target: number, actual: number) => {
     if (actual === 0) return 'text-slate-400';
@@ -156,6 +161,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
               <option value="Đang làm">Đang làm</option>
               <option value="Chờ duyệt">Chờ duyệt</option>
               <option value="Hoàn thành">Hoàn thành</option>
+              <option value="Đã hủy">Đã hủy</option>
+              <option value="Tạm hoãn">Tạm hoãn</option>
             </select>
             {hasActiveFilters && (
               <button
@@ -241,13 +248,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                   {task.deadline ? (
                     <div className="flex flex-col">
                       <span className={`text-sm font-medium ${
-                        new Date(task.deadline) < new Date() && task.status !== 'Hoàn thành' 
+                        new Date(task.deadline) < new Date() && !isInactiveStatus(task.status)
                           ? 'text-rose-600' 
                           : 'text-slate-700'
                       }`}>
                         {new Date(task.deadline).toLocaleDateString('vi-VN')}
                       </span>
-                      {new Date(task.deadline) < new Date() && task.status !== 'Hoàn thành' && (
+                      {new Date(task.deadline) < new Date() && !isInactiveStatus(task.status) && (
                         <span className="text-[10px] text-rose-500 font-bold uppercase">Quá hạn</span>
                       )}
                     </div>
