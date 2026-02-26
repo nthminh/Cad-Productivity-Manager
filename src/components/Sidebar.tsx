@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ClipboardList, FileText, Settings, LogOut, HardHat } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Settings, LogOut, HardHat } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -16,7 +16,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'tasks', label: 'Quản lý Task', icon: ClipboardList },
-    { id: 'viewer', label: 'Xem bản vẽ', icon: FileText },
     { id: 'settings', label: 'Cài đặt', icon: Settings },
   ];
 
