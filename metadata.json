@@ -1,0 +1,5 @@
+{
+  "name": "CAD Productivity Manager",
+  "description": "Ứng dụng quản lý năng suất kỹ sư CAD với tính năng theo dõi thời gian và xem bản vẽ trực tuyến.",
+  "requestFramePermissions": []
+}
