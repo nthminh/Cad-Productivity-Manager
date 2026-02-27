@@ -441,6 +441,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
   const [editVideoUrl, setEditVideoUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingEditImage, setUploadingEditImage] = useState(false);
+  const [editImageLocalPreview, setEditImageLocalPreview] = useState<string | null>(null);
   const [editImageUploadError, setEditImageUploadError] = useState<string | null>(null);
   const editImageInputRef = useRef<HTMLInputElement>(null);
   const currentUser = getCurrentUser();
@@ -459,6 +460,10 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
   const cancelEdit = () => {
     setIsEditing(false);
     setEditImageUploadError(null);
+    if (editImageLocalPreview) {
+      URL.revokeObjectURL(editImageLocalPreview);
+      setEditImageLocalPreview(null);
+    }
     if (editImageInputRef.current) editImageInputRef.current.value = '';
   };
 
@@ -481,6 +486,9 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
   const handleEditImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !storage) return;
+    // Show local preview immediately so user sees the image without waiting for upload
+    const localUrl = URL.createObjectURL(file);
+    setEditImageLocalPreview(localUrl);
     setUploadingEditImage(true);
     setEditImageUploadError(null);
     try {
@@ -489,7 +497,11 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
       await uploadBytes(fileRef, compressed);
       const url = await getDownloadURL(fileRef);
       setEditImageUrl(url);
+      URL.revokeObjectURL(localUrl);
+      setEditImageLocalPreview(null);
     } catch (err) {
+      URL.revokeObjectURL(localUrl);
+      setEditImageLocalPreview(null);
       console.error('Upload edit image error:', err);
       setEditImageUploadError('Tải ảnh thất bại. Vui lòng thử lại.');
     } finally {
@@ -591,6 +603,30 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
           </div>
           {editImageUploadError && (
             <p className="text-xs text-rose-600 font-medium">{editImageUploadError}</p>
+          )}
+          {(editImageLocalPreview || editImageUrl) && (
+            <div className="relative rounded-xl overflow-hidden border border-slate-200">
+              <img
+                src={editImageLocalPreview ?? editImageUrl}
+                alt="Xem trước ảnh"
+                className={`w-full max-h-48 object-contain bg-slate-50 ${editImageLocalPreview ? 'opacity-60' : ''}`}
+              />
+              {editImageLocalPreview && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xs text-slate-700 bg-white/80 px-2 py-1 rounded-lg">Đang tải lên...</span>
+                </div>
+              )}
+              {!editImageLocalPreview && editImageUrl && (
+                <button
+                  type="button"
+                  onClick={() => setEditImageUrl('')}
+                  className="absolute top-2 right-2 p-1 bg-white/80 hover:bg-rose-50 rounded-full text-slate-500 hover:text-rose-500 transition-colors"
+                  title="Xóa ảnh"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           )}
           <div className="flex items-center gap-2">
             <Video size={16} className="text-slate-400 flex-shrink-0" />
@@ -751,6 +787,7 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageLocalPreview, setImageLocalPreview] = useState<string | null>(null);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -786,6 +823,9 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
   const handleImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !storage) return;
+    // Show local preview immediately so user sees the image without waiting for upload
+    const localUrl = URL.createObjectURL(file);
+    setImageLocalPreview(localUrl);
     setUploadingImage(true);
     setImageUploadError(null);
     try {
@@ -794,7 +834,11 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
       await uploadBytes(fileRef, compressed);
       const url = await getDownloadURL(fileRef);
       setImageUrl(url);
+      URL.revokeObjectURL(localUrl);
+      setImageLocalPreview(null);
     } catch (err) {
+      URL.revokeObjectURL(localUrl);
+      setImageLocalPreview(null);
       console.error('Upload image error:', err);
       setImageUploadError('Tải ảnh thất bại. Vui lòng thử lại.');
     } finally {
@@ -845,6 +889,7 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
       setVideoUrl('');
       setPdfFile(null);
       setImageUploadError(null);
+      setImageLocalPreview(null);
       if (imageInputRef.current) imageInputRef.current.value = '';
       setShowForm(false);
     } catch (err) {
@@ -906,6 +951,8 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
                 setPdfFile(null);
                 setSubmitError(null);
                 setImageUploadError(null);
+                if (imageLocalPreview) URL.revokeObjectURL(imageLocalPreview);
+                setImageLocalPreview(null);
                 if (imageInputRef.current) imageInputRef.current.value = '';
               }}
               className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
@@ -957,6 +1004,31 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
             </div>
             {imageUploadError && (
               <p className="text-xs text-rose-600 font-medium">{imageUploadError}</p>
+            )}
+
+            {(imageLocalPreview || imageUrl) && (
+              <div className="relative rounded-xl overflow-hidden border border-slate-200">
+                <img
+                  src={imageLocalPreview ?? imageUrl}
+                  alt="Xem trước ảnh"
+                  className={`w-full max-h-48 object-contain bg-slate-50 ${imageLocalPreview ? 'opacity-60' : ''}`}
+                />
+                {imageLocalPreview && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xs text-slate-700 bg-white/80 px-2 py-1 rounded-lg">Đang tải lên...</span>
+                  </div>
+                )}
+                {!imageLocalPreview && imageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setImageUrl('')}
+                    className="absolute top-2 right-2 p-1 bg-white/80 hover:bg-rose-50 rounded-full text-slate-500 hover:text-rose-500 transition-colors"
+                    title="Xóa ảnh"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
             )}
 
             <div className="flex items-center gap-2">
@@ -1013,6 +1085,8 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
                   setPdfFile(null);
                   setSubmitError(null);
                   setImageUploadError(null);
+                  if (imageLocalPreview) URL.revokeObjectURL(imageLocalPreview);
+                  setImageLocalPreview(null);
                   if (imageInputRef.current) imageInputRef.current.value = '';
                 }}
                 disabled={submitting}
