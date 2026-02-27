@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { Trash2, CheckCircle, Clock, RefreshCw, Pencil, XCircle, PauseCircle } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -11,9 +12,10 @@ interface TaskContextMenuProps {
   onEdit: (task: Task) => void;
   canEdit?: boolean;
   canDelete?: boolean;
+  position: { top: number; right: number };
 }
 
-export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose, onRefresh, onEdit, canEdit = true, canDelete = true }) => {
+export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose, onRefresh, onEdit, canEdit = true, canDelete = true, position }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,10 +53,11 @@ export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose,
     onClose();
   };
 
-  return (
+  return ReactDOM.createPortal(
     <div
       ref={menuRef}
-      className="absolute right-0 mt-1 w-52 bg-white rounded-xl border border-slate-200 shadow-lg z-50 overflow-hidden"
+      className="fixed w-52 bg-white rounded-xl border border-slate-200 shadow-lg z-[9999] overflow-hidden"
+      style={{ top: position.top, right: position.right }}
     >
       <div className="py-1">
         {canEdit && (
@@ -123,6 +126,7 @@ export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose,
           </button>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -1,8 +1,9 @@
 import React from 'react';
-import { LayoutDashboard, ClipboardList, X, Users, DollarSign, BarChart3, Settings } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, X, Users, DollarSign, BarChart3, Settings, LogOut } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { type UserRole, getPermissions } from '../lib/permissions';
+import { logout } from '../lib/auth';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -14,9 +15,10 @@ interface SidebarProps {
   isMobileMenuOpen: boolean;
   setIsMobileMenuOpen: (isOpen: boolean) => void;
   userRole: UserRole;
+  onLogout: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, userRole }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, userRole, onLogout }) => {
   const perms = getPermissions(userRole);
 
   const allMenuItems = [
@@ -90,6 +92,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
             </button>
           ))}
         </nav>
+
+        <div className="p-4 border-t border-slate-800">
+          <button
+            onClick={() => { logout(); onLogout(); }}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-slate-400 group"
+          >
+            <LogOut size={20} className="text-slate-500 group-hover:text-slate-300 transition-colors" />
+            Đăng xuất
+          </button>
+        </div>
       </aside>
     </>
   );
