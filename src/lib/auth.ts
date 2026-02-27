@@ -1,7 +1,28 @@
-const PASSWORD_HASH_KEY = 'app_password_hash';
-const SESSION_KEY = 'app_authenticated';
+import type { UserRole } from './permissions';
+
+export type { UserRole };
+
+export interface AppUser {
+  username: string;
+  displayName: string;
+  role: UserRole;
+  passwordHash: string;
+}
+
+interface SessionUser {
+  username: string;
+  displayName: string;
+  role: UserRole;
+}
+
+const PASSWORD_HASH_KEY = 'app_password_hash'; // legacy key kept for migration
+const APP_USERS_KEY = 'app_users';
+const SESSION_USER_KEY = 'app_session_user';
+const LEGACY_SESSION_KEY = 'app_authenticated';
 const DEFAULT_PASSWORD = 'admin';
 const PBKDF2_ITERATIONS = 100000;
+
+// ── Crypto helpers ───────────────────────────────────────────────────
 
 async function sha256(text: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -37,6 +58,18 @@ async function pbkdf2Hash(password: string, salt: Uint8Array): Promise<string> {
   return toHex(new Uint8Array(bits));
 }
 
+async function checkHash(password: string, stored: string): Promise<boolean> {
+  if (stored.startsWith('pbkdf2:')) {
+    const parts = stored.split(':');
+    if (parts.length !== 3) return false;
+    const salt = fromHex(parts[1]);
+    const expectedHash = parts[2];
+    return (await pbkdf2Hash(password, salt)) === expectedHash;
+  }
+  // Legacy plain SHA-256 fallback
+  return (await sha256(password)) === stored;
+}
+
 /** Hashes a password with PBKDF2 + random salt. Returns "pbkdf2:<saltHex>:<hashHex>". */
 export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -44,49 +77,162 @@ export async function hashPassword(password: string): Promise<string> {
   return `pbkdf2:${toHex(salt)}:${hash}`;
 }
 
+// ── User storage ─────────────────────────────────────────────────────
+
+export function getUsers(): AppUser[] {
+  const stored = localStorage.getItem(APP_USERS_KEY);
+  if (!stored) return [];
+  try {
+    return JSON.parse(stored) as AppUser[];
+  } catch {
+    return [];
+  }
+}
+
+function saveUsers(users: AppUser[]): void {
+  localStorage.setItem(APP_USERS_KEY, JSON.stringify(users));
+}
+
+/**
+ * Ensures at least a default admin user exists.
+ * Migrates a legacy single-password hash if present.
+ * Call once on app startup (e.g. in LoginGate useEffect).
+ */
+export async function ensureDefaultUsers(): Promise<void> {
+  const users = getUsers();
+  if (users.length === 0) {
+    const legacyHash = localStorage.getItem(PASSWORD_HASH_KEY);
+    const passwordHash = legacyHash ?? (await hashPassword(DEFAULT_PASSWORD));
+    saveUsers([
+      {
+        username: 'admin',
+        displayName: 'Quản trị viên',
+        role: 'admin',
+        passwordHash,
+      },
+    ]);
+  }
+}
+
+// ── Authentication ────────────────────────────────────────────────────
+
+/** Verifies username + password and returns the matching AppUser, or null on failure. */
+export async function verifyUser(username: string, password: string): Promise<AppUser | null> {
+  const users = getUsers();
+  const user = users.find((u) => u.username.toLowerCase() === username.trim().toLowerCase());
+  if (!user) return null;
+  const valid = await checkHash(password, user.passwordHash);
+  return valid ? user : null;
+}
+
+export function getCurrentUser(): SessionUser | null {
+  const stored = sessionStorage.getItem(SESSION_USER_KEY);
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored) as SessionUser;
+  } catch {
+    return null;
+  }
+}
+
+export function isAuthenticated(): boolean {
+  return getCurrentUser() !== null;
+}
+
+export function setCurrentUser(user: AppUser): void {
+  const sessionUser: SessionUser = {
+    username: user.username,
+    displayName: user.displayName,
+    role: user.role,
+  };
+  sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(sessionUser));
+}
+
+/** @deprecated Use setCurrentUser instead. Kept for backward compatibility. */
+export function setAuthenticated(): void {
+  // no-op
+}
+
+export function logout(): void {
+  sessionStorage.removeItem(SESSION_USER_KEY);
+  sessionStorage.removeItem(LEGACY_SESSION_KEY);
+}
+
+// ── Password management ───────────────────────────────────────────────
+
+/** @deprecated Use updateUser({ password }) instead. Kept for backward compatibility. */
 export function getStoredPasswordHash(): string | null {
   return localStorage.getItem(PASSWORD_HASH_KEY);
 }
 
+/**
+ * Updates the password hash for the currently logged-in user.
+ * @deprecated Use updateUser({ password }) instead. Kept for backward compatibility.
+ */
 export function setStoredPasswordHash(hash: string): void {
+  const session = getCurrentUser();
+  if (session) {
+    const users = getUsers();
+    const idx = users.findIndex((u) => u.username === session.username);
+    if (idx !== -1) {
+      users[idx] = { ...users[idx], passwordHash: hash };
+      saveUsers(users);
+    }
+  }
   localStorage.setItem(PASSWORD_HASH_KEY, hash);
 }
 
-export function isAuthenticated(): boolean {
-  return sessionStorage.getItem(SESSION_KEY) === 'true';
-}
-
-export function setAuthenticated(): void {
-  sessionStorage.setItem(SESSION_KEY, 'true');
-}
-
-export function logout(): void {
-  sessionStorage.removeItem(SESSION_KEY);
-}
-
-/** Verifies a plaintext password against the stored hash (PBKDF2) or against the default (SHA-256). */
-export async function verifyPassword(password: string): Promise<boolean> {
-  const stored = getStoredPasswordHash();
-  if (!stored) {
-    // No custom password set yet – compare against the built-in default using SHA-256
-    return (await sha256(password)) === (await sha256(DEFAULT_PASSWORD));
-  }
-  if (stored.startsWith('pbkdf2:')) {
-    const parts = stored.split(':');
-    if (parts.length !== 3) return false;
-    const salt = fromHex(parts[1]);
-    const expectedHash = parts[2];
-    const hash = await pbkdf2Hash(password, salt);
-    return hash === expectedHash;
-  }
-  // Legacy plain SHA-256 fallback
-  return (await sha256(password)) === stored;
-}
-
-/** Returns true if the app is still using the default password (no custom password set, or stored hash matches "admin"). */
+/** Returns true if the currently logged-in user is still using the default password. */
 export async function isUsingDefaultPassword(): Promise<boolean> {
-  const stored = getStoredPasswordHash();
-  if (!stored) return true;
-  return verifyPassword(DEFAULT_PASSWORD);
+  const session = getCurrentUser();
+  if (!session) {
+    // Before first login: check if any user exists
+    return getUsers().length === 0;
+  }
+  return (await verifyUser(session.username, DEFAULT_PASSWORD)) !== null;
+}
+
+/** @deprecated Use verifyUser instead. Checks if the password matches any existing user. */
+export async function verifyPassword(password: string): Promise<boolean> {
+  const users = getUsers();
+  for (const user of users) {
+    if (await checkHash(password, user.passwordHash)) return true;
+  }
+  return false;
+}
+
+// ── User management (admin only in UI) ───────────────────────────────
+
+export async function addUser(
+  username: string,
+  displayName: string,
+  role: UserRole,
+  password: string,
+): Promise<void> {
+  const users = getUsers();
+  if (users.find((u) => u.username.toLowerCase() === username.trim().toLowerCase())) {
+    throw new Error('Tên đăng nhập đã tồn tại.');
+  }
+  const passwordHash = await hashPassword(password);
+  saveUsers([...users, { username: username.trim(), displayName, role, passwordHash }]);
+}
+
+export async function updateUser(
+  username: string,
+  updates: { displayName?: string; role?: UserRole; password?: string },
+): Promise<void> {
+  const users = getUsers();
+  const idx = users.findIndex((u) => u.username === username);
+  if (idx === -1) throw new Error('Không tìm thấy người dùng.');
+  const updated = { ...users[idx] };
+  if (updates.displayName !== undefined) updated.displayName = updates.displayName;
+  if (updates.role !== undefined) updated.role = updates.role;
+  if (updates.password !== undefined) updated.passwordHash = await hashPassword(updates.password);
+  users[idx] = updated;
+  saveUsers(users);
+}
+
+export function removeUser(username: string): void {
+  saveUsers(getUsers().filter((u) => u.username !== username));
 }
 

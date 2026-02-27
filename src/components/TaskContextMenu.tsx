@@ -9,9 +9,11 @@ interface TaskContextMenuProps {
   onClose: () => void;
   onRefresh: () => void;
   onEdit: (task: Task) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
-export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose, onRefresh, onEdit }) => {
+export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose, onRefresh, onEdit, canEdit = true, canDelete = true }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,15 +57,17 @@ export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose,
       className="absolute right-0 mt-1 w-52 bg-white rounded-xl border border-slate-200 shadow-lg z-50 overflow-hidden"
     >
       <div className="py-1">
-        <button
-          onClick={() => { onEdit(task); onClose(); }}
-          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-        >
-          <Pencil size={16} />
-          Chỉnh sửa
-        </button>
-        <div className="my-1 border-t border-slate-100" />
-        {task.status !== 'Hoàn thành' && (
+        {canEdit && (
+          <button
+            onClick={() => { onEdit(task); onClose(); }}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <Pencil size={16} />
+            Chỉnh sửa
+          </button>
+        )}
+        {canEdit && <div className="my-1 border-t border-slate-100" />}
+        {canEdit && task.status !== 'Hoàn thành' && (
           <button
             onClick={() => handleStatusChange('Hoàn thành')}
             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-emerald-600 hover:bg-emerald-50 transition-colors"
@@ -72,7 +76,7 @@ export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose,
             Đánh dấu hoàn thành
           </button>
         )}
-        {task.status !== 'Đang làm' && (
+        {canEdit && task.status !== 'Đang làm' && (
           <button
             onClick={() => handleStatusChange('Đang làm')}
             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-blue-600 hover:bg-blue-50 transition-colors"
@@ -81,7 +85,7 @@ export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose,
             Chuyển sang Đang làm
           </button>
         )}
-        {task.status !== 'Chờ duyệt' && (
+        {canEdit && task.status !== 'Chờ duyệt' && (
           <button
             onClick={() => handleStatusChange('Chờ duyệt')}
             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-amber-600 hover:bg-amber-50 transition-colors"
@@ -90,7 +94,7 @@ export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose,
             Chuyển sang Chờ duyệt
           </button>
         )}
-        {task.status !== 'Đã hủy' && (
+        {canEdit && task.status !== 'Đã hủy' && (
           <button
             onClick={() => handleStatusChange('Đã hủy')}
             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-rose-500 hover:bg-rose-50 transition-colors"
@@ -99,7 +103,7 @@ export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose,
             Đã hủy
           </button>
         )}
-        {task.status !== 'Tạm hoãn' && (
+        {canEdit && task.status !== 'Tạm hoãn' && (
           <button
             onClick={() => handleStatusChange('Tạm hoãn')}
             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-500 hover:bg-slate-50 transition-colors"
@@ -108,14 +112,16 @@ export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ task, onClose,
             Tạm hoãn
           </button>
         )}
-        <div className="my-1 border-t border-slate-100" />
-        <button
-          onClick={handleDelete}
-          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors"
-        >
-          <Trash2 size={16} />
-          Xóa
-        </button>
+        {canDelete && <div className="my-1 border-t border-slate-100" />}
+        {canDelete && (
+          <button
+            onClick={handleDelete}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors"
+          >
+            <Trash2 size={16} />
+            Xóa
+          </button>
+        )}
       </div>
     </div>
   );

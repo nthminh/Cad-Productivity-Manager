@@ -18,7 +18,7 @@ interface SalaryRecord {
   totalSalary: number;
 }
 
-function EditableSalary({ engineer }: { engineer: Engineer }) {
+function EditableSalary({ engineer, readOnly }: { engineer: Engineer; readOnly?: boolean }) {
   const [value, setValue] = useState(String(engineer.basic_salary ?? 0));
 
   useEffect(() => {
@@ -36,6 +36,16 @@ function EditableSalary({ engineer }: { engineer: Engineer }) {
     }
   };
 
+  if (readOnly) {
+    return (
+      <span className="text-sm text-slate-700">
+        {(engineer.basic_salary ?? 0) > 0
+          ? (engineer.basic_salary ?? 0).toLocaleString('vi-VN') + ' ₫'
+          : <span className="text-slate-400 italic">Chưa có</span>}
+      </span>
+    );
+  }
+
   return (
     <input
       type="number"
@@ -50,7 +60,7 @@ function EditableSalary({ engineer }: { engineer: Engineer }) {
   );
 }
 
-export const SalaryPage: React.FC = () => {
+export const SalaryPage: React.FC<{ canEditSalary?: boolean }> = ({ canEditSalary = true }) => {
   const [engineers, setEngineers] = useState<Engineer[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,7 +182,7 @@ export const SalaryPage: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{row.taskCount} task</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <EditableSalary engineer={row.engineer} />
+                    <EditableSalary engineer={row.engineer} readOnly={!canEditSalary} />
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-amber-700 whitespace-nowrap">
                     {row.projectSalary > 0 ? row.projectSalary.toLocaleString('vi-VN') + ' ₫' : <span className="text-slate-400">0 ₫</span>}

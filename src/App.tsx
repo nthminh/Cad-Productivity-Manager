@@ -33,10 +33,12 @@ import { LoginGate } from './components/LoginGate';
 import { db, isFirebaseConfigured } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { Task } from './types/database.types';
-import { isAuthenticated } from './lib/auth';
+import { isAuthenticated, getCurrentUser } from './lib/auth';
+import { type UserRole, getPermissions, ROLE_LABELS, ROLE_BADGE_COLORS } from './lib/permissions';
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(isAuthenticated());
+  const [appUser, setAppUser] = useState(getCurrentUser());
   const [activeTab, setActiveTab] = useState('dashboard');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,10 +92,16 @@ export default function App() {
     fullName: t.drawing_name
   }));
 
+  const role: UserRole = appUser?.role ?? 'engineer';
+  const perms = getPermissions(role);
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       {!authenticated && (
-        <LoginGate onAuthenticated={() => setAuthenticated(true)} />
+        <LoginGate onAuthenticated={() => {
+          setAuthenticated(true);
+          setAppUser(getCurrentUser());
+        }} />
       )}
       {authenticated && (
       <>
@@ -102,6 +110,7 @@ export default function App() {
         setActiveTab={setActiveTab} 
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
+        userRole={role}
       />
 
       <div className="lg:pl-64 flex-1 flex flex-col">
@@ -138,6 +147,14 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {appUser && (
+              <div className="hidden sm:flex items-center gap-2">
+                <span className="text-sm text-slate-600 font-medium hidden md:block">{appUser.displayName}</span>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${ROLE_BADGE_COLORS[role]}`}>
+                  {ROLE_LABELS[role]}
+                </span>
+              </div>
+            )}
             <div className="relative hidden md:block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
@@ -146,13 +163,15 @@ export default function App() {
                 className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all w-48 lg:w-64"
               />
             </div>
-            <button 
-              onClick={() => setShowTaskForm(true)}
-              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-3 lg:px-5 py-2.5 rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
-            >
-              <Plus size={20} className="hidden sm:inline-block"/>
-              <span className="text-sm sm:text-base">Thêm Task</span>
-            </button>
+            {perms.canAddTask && (
+              <button 
+                onClick={() => setShowTaskForm(true)}
+                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-3 lg:px-5 py-2.5 rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+              >
+                <Plus size={20} className="hidden sm:inline-block"/>
+                <span className="text-sm sm:text-base">Thêm Task</span>
+              </button>
+            )}
           </div>
         </header>
 
@@ -162,7 +181,7 @@ export default function App() {
               <AlertCircle size={20} />
               <p className="text-sm font-medium">
                 {error}
-                {!isFirebaseConfigured && (
+                {!isFirebaseConfigured && perms.canViewSettings && (
                   <button
                     onClick={() => setActiveTab('settings')}
                     className="ml-2 underline font-semibold hover:text-rose-900 transition-colors"
@@ -174,13 +193,13 @@ export default function App() {
             </div>
           )}
 
-          {activeTab === 'engineers' ? (
-            <EngineerList />
-          ) : activeTab === 'salary' ? (
-            <SalaryPage />
-          ) : activeTab === 'reports' ? (
+          {activeTab === 'engineers' && perms.canViewEngineers ? (
+            <EngineerList canManage={perms.canManageEngineers} />
+          ) : activeTab === 'salary' && perms.canViewSalary ? (
+            <SalaryPage canEditSalary={perms.canEditSalary} />
+          ) : activeTab === 'reports' && perms.canViewReports ? (
             <ReportsPage />
-          ) : activeTab === 'settings' ? (
+          ) : activeTab === 'settings' && perms.canViewSettings ? (
             <SettingsPage />
           ) : activeTab === 'dashboard' ? (
             <div className="space-y-6">
@@ -275,7 +294,9 @@ export default function App() {
               <TaskTable 
                 tasks={tasks} 
                 onRefresh={fetchTasks} 
-                onViewDrawing={(url) => setViewerUrl(url)} 
+                onViewDrawing={(url) => setViewerUrl(url)}
+                canEdit={perms.canEditTask}
+                canDelete={perms.canDeleteTask}
               />
             </div>
           )}

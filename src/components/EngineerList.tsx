@@ -173,7 +173,7 @@ const EngineerForm: React.FC<EngineerFormProps> = ({ initial, onClose, onSaved }
   );
 };
 
-export const EngineerList: React.FC = () => {
+export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = true }) => {
   const [engineers, setEngineers] = useState<Engineer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -207,13 +207,15 @@ export const EngineerList: React.FC = () => {
           <h3 className="text-lg font-bold text-slate-900">Danh sách kỹ sư</h3>
           <p className="text-sm text-slate-500 mt-0.5">Quản lý thông tin các kỹ sư và nhân viên</p>
         </div>
-        <button
-          onClick={() => { setEditEngineer(null); setShowForm(true); }}
-          className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
-        >
-          <Plus size={18} />
-          Thêm kỹ sư
-        </button>
+        {canManage && (
+          <button
+            onClick={() => { setEditEngineer(null); setShowForm(true); }}
+            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+          >
+            <Plus size={18} />
+            Thêm kỹ sư
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
@@ -263,22 +265,24 @@ export const EngineerList: React.FC = () => {
                     {eng.basic_salary > 0 ? eng.basic_salary.toLocaleString('vi-VN') + ' ₫' : <span className="text-slate-400 italic">Chưa có</span>}
                   </td>
                   <td className="px-6 py-4 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => { setEditEngineer(eng); setShowForm(true); }}
-                        className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
-                        title="Chỉnh sửa"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(eng)}
-                        className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                        title="Xóa"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
+                    {canManage && (
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => { setEditEngineer(eng); setShowForm(true); }}
+                          className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title="Chỉnh sửa"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(eng)}
+                          className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Xóa"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

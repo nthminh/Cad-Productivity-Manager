@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Save, CheckCircle2, AlertCircle, Trash2, ClipboardPaste, KeyRound, Eye, EyeOff, LogOut } from 'lucide-react';
+import { Save, CheckCircle2, AlertCircle, Trash2, ClipboardPaste, KeyRound, Eye, EyeOff, LogOut, UserPlus, Users, ShieldCheck } from 'lucide-react';
 import { isFirebaseConfigured } from '../lib/firebase';
-import { hashPassword, setStoredPasswordHash, isUsingDefaultPassword, logout } from '../lib/auth';
+import { isUsingDefaultPassword, logout, getCurrentUser, updateUser, getUsers, addUser, removeUser, type AppUser } from '../lib/auth';
+import { type UserRole, ROLE_LABELS, ROLE_BADGE_COLORS } from '../lib/permissions';
 
 interface FirebaseConfig {
   apiKey: string;
@@ -74,6 +75,9 @@ const parseFirebaseConfigText = (text: string): FirebaseConfig | null => {
 };
 
 export const SettingsPage: React.FC = () => {
+  const currentSession = getCurrentUser();
+  const isAdmin = currentSession?.role === 'admin';
+
   const [config, setConfig] = useState<FirebaseConfig>(emptyConfig);
   const [hasSavedConfig, setHasSavedConfig] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -90,9 +94,25 @@ export const SettingsPage: React.FC = () => {
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [usingDefaultPwd, setUsingDefaultPwd] = useState(false);
 
+  // User management state (admin only)
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [newDisplayName, setNewDisplayName] = useState('');
+  const [newUserRole, setNewUserRole] = useState<UserRole>('engineer');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [showNewUserPassword, setShowNewUserPassword] = useState(false);
+  const [addUserError, setAddUserError] = useState<string | null>(null);
+  const [addUserSaved, setAddUserSaved] = useState(false);
+  const [addUserLoading, setAddUserLoading] = useState(false);
+
   useEffect(() => {
     isUsingDefaultPassword().then(setUsingDefaultPwd);
   }, [passwordSaved]);
+
+  useEffect(() => {
+    if (isAdmin) setUsers(getUsers());
+  }, [isAdmin, addUserSaved]);
 
   const isEnvConfigured =
     !!import.meta.env.VITE_FIREBASE_API_KEY && !!import.meta.env.VITE_FIREBASE_PROJECT_ID;
@@ -152,17 +172,53 @@ export const SettingsPage: React.FC = () => {
       setPasswordError('Mật khẩu xác nhận không khớp.');
       return;
     }
-    const hash = await hashPassword(newPassword);
-    setStoredPasswordHash(hash);
-    setPasswordSaved(true);
-    setNewPassword('');
-    setConfirmPassword('');
-    setTimeout(() => setPasswordSaved(false), 3000);
+    if (!currentSession) return;
+    try {
+      await updateUser(currentSession.username, { password: newPassword });
+      setPasswordSaved(true);
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setPasswordSaved(false), 3000);
+    } catch {
+      setPasswordError('Có lỗi xảy ra. Vui lòng thử lại.');
+    }
   };
 
   const handleLogout = () => {
     logout();
     window.location.reload();
+  };
+
+  const handleAddUser = async () => {
+    setAddUserError(null);
+    if (!newUsername.trim() || !newDisplayName.trim()) {
+      setAddUserError('Tên đăng nhập và tên hiển thị là bắt buộc.');
+      return;
+    }
+    if (newUserPassword.length < 8) {
+      setAddUserError('Mật khẩu phải có ít nhất 8 ký tự.');
+      return;
+    }
+    setAddUserLoading(true);
+    try {
+      await addUser(newUsername.trim(), newDisplayName.trim(), newUserRole, newUserPassword);
+      setNewUsername('');
+      setNewDisplayName('');
+      setNewUserRole('engineer');
+      setNewUserPassword('');
+      setShowAddUser(false);
+      setAddUserSaved((v) => !v);
+    } catch (err: unknown) {
+      setAddUserError(err instanceof Error ? err.message : 'Có lỗi xảy ra.');
+    } finally {
+      setAddUserLoading(false);
+    }
+  };
+
+  const handleRemoveUser = (username: string) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa người dùng "${username}"?`)) return;
+    removeUser(username);
+    setUsers(getUsers());
   };
 
   return (
@@ -363,6 +419,137 @@ export const SettingsPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* User Management section — admin only */}
+      {isAdmin && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Users size={18} className="text-slate-500" />
+              <h3 className="text-base font-bold text-slate-900">Quản lý người dùng</h3>
+            </div>
+            <button
+              onClick={() => { setShowAddUser((v) => !v); setAddUserError(null); }}
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-all active:scale-95"
+            >
+              <UserPlus size={16} />
+              Thêm người dùng
+            </button>
+          </div>
+
+          {showAddUser && (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+              <p className="text-xs font-bold text-slate-500 uppercase">Tạo người dùng mới</p>
+              {addUserError && (
+                <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">{addUserError}</div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-500">Tên đăng nhập</label>
+                  <input
+                    value={newUsername}
+                    onChange={(e) => { setNewUsername(e.target.value); setAddUserError(null); }}
+                    placeholder="vd: nguyenvana"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-500">Tên hiển thị</label>
+                  <input
+                    value={newDisplayName}
+                    onChange={(e) => { setNewDisplayName(e.target.value); setAddUserError(null); }}
+                    placeholder="vd: Nguyễn Văn A"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-500">Quyền</label>
+                  <select
+                    value={newUserRole}
+                    onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all"
+                  >
+                    {(Object.keys(ROLE_LABELS) as UserRole[]).map((r) => (
+                      <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-500">Mật khẩu</label>
+                  <div className="relative">
+                    <input
+                      type={showNewUserPassword ? 'text' : 'password'}
+                      value={newUserPassword}
+                      onChange={(e) => { setNewUserPassword(e.target.value); setAddUserError(null); }}
+                      placeholder="≥ 8 ký tự"
+                      className="w-full px-3 py-2 pr-9 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all"
+                    />
+                    <button type="button" onClick={() => setShowNewUserPassword((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                      {showNewUserPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={handleAddUser}
+                  disabled={addUserLoading}
+                  className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 text-white px-4 py-2 rounded-xl font-bold text-sm transition-all active:scale-95"
+                >
+                  <Save size={15} />
+                  {addUserLoading ? 'Đang lưu...' : 'Lưu'}
+                </button>
+                <button
+                  onClick={() => { setShowAddUser(false); setAddUserError(null); }}
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                >
+                  Hủy
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left">
+              <thead>
+                <tr className="bg-slate-50 rounded-xl">
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Tên đăng nhập</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Tên hiển thị</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Quyền</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {users.map((u) => (
+                  <tr key={u.username} className="hover:bg-slate-50/50">
+                    <td className="px-4 py-3 text-sm font-mono text-slate-700">{u.username}</td>
+                    <td className="px-4 py-3 text-sm text-slate-700">{u.displayName}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${ROLE_BADGE_COLORS[u.role]}`}>
+                        <ShieldCheck size={11} className="inline mr-1" />
+                        {ROLE_LABELS[u.role]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {u.username !== currentSession?.username && (
+                        <button
+                          onClick={() => handleRemoveUser(u.username)}
+                          className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Xóa người dùng"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Logout section */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
