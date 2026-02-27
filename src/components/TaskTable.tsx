@@ -74,11 +74,12 @@ interface TaskTableProps {
 
 function exportToCSV(tasks: Task[]) {
   const headers = [
-    'Tên dự án', 'Kỹ sư', 'Độ khó', 'Trạng thái', 'Hạn chót',
-    'Giờ mục tiêu', 'Giờ thực tế', 'Năng suất (%)', 'Giá thành (VNĐ)', 'Ngày tạo',
+    'Tên dự án', 'Thông tin dự án', 'Kỹ sư', 'Độ khó', 'Trạng thái', 'Hạn chót',
+    'Giờ mục tiêu', 'Giờ thực tế', 'Năng suất (%)', 'Giá thành (VNĐ)', 'Link Drive', 'Ngày tạo',
   ];
   const rows = tasks.map(t => [
     t.drawing_name,
+    t.description ?? '',
     t.engineer_name,
     t.difficulty,
     t.status,
@@ -86,13 +87,16 @@ function exportToCSV(tasks: Task[]) {
     t.target_hours,
     t.actual_hours.toFixed(1),
     t.actual_hours > 0 ? ((t.target_hours / t.actual_hours) * 100).toFixed(1) : '',
-    t.cost ?? 0,
+    t.cost ?? '',
+    t.drive_link ?? '',
     new Date(t.created_at).toLocaleDateString('vi-VN'),
   ]);
   const csvContent = [headers, ...rows]
     .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
     .join('\n');
-  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+  const encoder = new TextEncoder();
+  const blob = new Blob([bom, encoder.encode(csvContent)], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
