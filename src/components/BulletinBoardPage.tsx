@@ -437,6 +437,9 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
   const [editImageUrl, setEditImageUrl] = useState('');
   const [editVideoUrl, setEditVideoUrl] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploadingEditImage, setUploadingEditImage] = useState(false);
+  const [editImageUploadError, setEditImageUploadError] = useState<string | null>(null);
+  const editImageInputRef = useRef<HTMLInputElement>(null);
   const currentUser = getCurrentUser();
   const canDelete =
     post.authorUsername === currentUser?.username || userRole === 'admin';
@@ -452,6 +455,8 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
 
   const cancelEdit = () => {
     setIsEditing(false);
+    setEditImageUploadError(null);
+    if (editImageInputRef.current) editImageInputRef.current.value = '';
   };
 
   const saveEdit = async () => {
@@ -464,8 +469,29 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
         videoUrl: editVideoUrl.trim(),
       });
       setIsEditing(false);
+      if (editImageInputRef.current) editImageInputRef.current.value = '';
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleEditImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !storage) return;
+    setUploadingEditImage(true);
+    setEditImageUploadError(null);
+    try {
+      const compressed = await compressImage(file);
+      const fileRef = storageRef(storage, `bulletin_images/${crypto.randomUUID()}.jpg`);
+      await uploadBytes(fileRef, compressed);
+      const url = await getDownloadURL(fileRef);
+      setEditImageUrl(url);
+    } catch (err) {
+      console.error('Upload edit image error:', err);
+      setEditImageUploadError('Tải ảnh thất bại. Vui lòng thử lại.');
+    } finally {
+      setUploadingEditImage(false);
+      if (editImageInputRef.current) editImageInputRef.current.value = '';
     }
   };
 
@@ -538,10 +564,31 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
               value={editImageUrl}
               onChange={(e) => setEditImageUrl(e.target.value)}
               placeholder="URL ảnh (tuỳ chọn)"
-              disabled={saving}
-              className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm"
+              disabled={saving || uploadingEditImage}
+              className="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm"
             />
+            <input
+              ref={editImageInputRef}
+              type="file"
+              accept="image/*"
+              disabled={saving || uploadingEditImage}
+              onChange={handleEditImageFileSelect}
+              className="hidden"
+            />
+            <button
+              type="button"
+              disabled={saving || uploadingEditImage}
+              onClick={() => editImageInputRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-100 transition-colors flex-shrink-0"
+              title="Tải ảnh từ máy tính"
+            >
+              <Upload size={14} />
+              {uploadingEditImage ? 'Đang tải...' : 'Tải ảnh lên'}
+            </button>
           </div>
+          {editImageUploadError && (
+            <p className="text-xs text-rose-600 font-medium">{editImageUploadError}</p>
+          )}
           <div className="flex items-center gap-2">
             <Video size={16} className="text-slate-400 flex-shrink-0" />
             <input
@@ -565,11 +612,11 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
             <button
               type="button"
               onClick={saveEdit}
-              disabled={saving || !editContent.trim()}
+              disabled={saving || uploadingEditImage || !editContent.trim()}
               className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 text-white px-5 py-2 rounded-xl text-sm font-medium transition-all active:scale-95"
             >
               <Send size={16} />
-              {saving ? 'Đang lưu...' : 'Lưu'}
+              {uploadingEditImage ? 'Đang tải ảnh...' : saving ? 'Đang lưu...' : 'Lưu'}
             </button>
           </div>
         </div>
@@ -700,9 +747,11 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const currentUser = getCurrentUser();
 
   const handleImagePaste = async (file: File): Promise<string> => {
@@ -715,6 +764,26 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
       return await getDownloadURL(fileRef);
     } finally {
       setUploadingImage(false);
+    }
+  };
+
+  const handleImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !storage) return;
+    setUploadingImage(true);
+    setImageUploadError(null);
+    try {
+      const compressed = await compressImage(file);
+      const fileRef = storageRef(storage, `bulletin_images/${crypto.randomUUID()}.jpg`);
+      await uploadBytes(fileRef, compressed);
+      const url = await getDownloadURL(fileRef);
+      setImageUrl(url);
+    } catch (err) {
+      console.error('Upload image error:', err);
+      setImageUploadError('Tải ảnh thất bại. Vui lòng thử lại.');
+    } finally {
+      setUploadingImage(false);
+      if (imageInputRef.current) imageInputRef.current.value = '';
     }
   };
 
@@ -759,6 +828,8 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
       setImageUrl('');
       setVideoUrl('');
       setPdfFile(null);
+      setImageUploadError(null);
+      if (imageInputRef.current) imageInputRef.current.value = '';
       setShowForm(false);
     } catch (err) {
       console.error('Error creating post:', err);
@@ -818,6 +889,8 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
                 setVideoUrl('');
                 setPdfFile(null);
                 setSubmitError(null);
+                setImageUploadError(null);
+                if (imageInputRef.current) imageInputRef.current.value = '';
               }}
               className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             >
@@ -844,10 +917,31 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
                 placeholder="URL ảnh (tuỳ chọn)"
-                disabled={submitting}
-                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm"
+                disabled={submitting || uploadingImage}
+                className="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm"
               />
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                disabled={submitting || uploadingImage}
+                onChange={handleImageFileSelect}
+                className="hidden"
+              />
+              <button
+                type="button"
+                disabled={submitting || uploadingImage}
+                onClick={() => imageInputRef.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-100 transition-colors flex-shrink-0"
+                title="Tải ảnh từ máy tính"
+              >
+                <Upload size={14} />
+                {uploadingImage ? 'Đang tải...' : 'Tải ảnh lên'}
+              </button>
             </div>
+            {imageUploadError && (
+              <p className="text-xs text-rose-600 font-medium">{imageUploadError}</p>
+            )}
 
             <div className="flex items-center gap-2">
               <Video size={16} className="text-slate-400 flex-shrink-0" />
@@ -902,6 +996,8 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
                   setVideoUrl('');
                   setPdfFile(null);
                   setSubmitError(null);
+                  setImageUploadError(null);
+                  if (imageInputRef.current) imageInputRef.current.value = '';
                 }}
                 disabled={submitting}
                 className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all"
