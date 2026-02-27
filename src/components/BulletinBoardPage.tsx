@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Send, Trash2, MessageSquare, Image as ImageIcon, Video, X, ChevronDown, ChevronUp, Newspaper } from 'lucide-react';
-import { db } from '../lib/firebase';
+import { Plus, Send, Trash2, MessageSquare, Image as ImageIcon, Video, X, ChevronDown, ChevronUp, Newspaper, Bold, Italic, Underline, FileText, Upload } from 'lucide-react';
+import { db, storage } from '../lib/firebase';
 import {
   collection,
   query,
@@ -15,6 +15,7 @@ import {
   arrayUnion,
   arrayRemove,
 } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getCurrentUser } from '../lib/auth';
 import type { UserRole } from '../lib/permissions';
 
@@ -25,6 +26,8 @@ interface BulletinPost {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
+  pdfUrl?: string;
+  pdfName?: string;
   createdAt: Timestamp | null;
   reactions: {
     like: string[];
@@ -71,6 +74,134 @@ function getYoutubeEmbedUrl(url: string): string | null {
   if (match) return `https://www.youtube.com/embed/${match[1]}`;
   return null;
 }
+
+const HTML_TAG_RE = /(<[a-z]+[\s/>]|<\/[a-z]+>)/i;
+
+function sanitizeHtml(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('script, style, iframe, object, embed, form').forEach((el) => el.remove());
+  doc.querySelectorAll('*').forEach((el) => {
+    Array.from(el.attributes).forEach((attr) => {
+      if (attr.name.startsWith('on') || (attr.name === 'href' && /^javascript:/i.test(attr.value))) {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
+  return doc.body.innerHTML;
+}
+
+const TOOLBAR_BTN = 'p-1.5 rounded hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-40';
+
+interface RichTextEditorProps {
+  onChange: (html: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}
+
+const RichTextEditor: React.FC<RichTextEditorProps> = ({ onChange, placeholder, disabled }) => {
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  const format = (command: string, value?: string) => {
+    document.execCommand(command, false, value);
+    editorRef.current?.focus();
+    onChange(editorRef.current?.innerHTML ?? '');
+  };
+
+  const applyLetterSpacing = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+    const selectedText = selection.toString()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    document.execCommand('insertHTML', false, `<span style="letter-spacing:0.08em">${selectedText}</span>`);
+    onChange(editorRef.current?.innerHTML ?? '');
+  };
+
+  return (
+    <div className="border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500 transition-all">
+      <div className="flex items-center flex-wrap gap-0.5 px-2 py-1.5 bg-slate-50 border-b border-slate-200">
+        <button
+          type="button"
+          disabled={disabled}
+          onMouseDown={(e) => { e.preventDefault(); format('bold'); }}
+          className={TOOLBAR_BTN}
+          title="In đậm"
+        >
+          <Bold size={14} />
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onMouseDown={(e) => { e.preventDefault(); format('italic'); }}
+          className={TOOLBAR_BTN}
+          title="In nghiêng"
+        >
+          <Italic size={14} />
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onMouseDown={(e) => { e.preventDefault(); format('underline'); }}
+          className={TOOLBAR_BTN}
+          title="Gạch dưới"
+        >
+          <Underline size={14} />
+        </button>
+        <div className="w-px h-4 bg-slate-300 mx-1" />
+        <button
+          type="button"
+          disabled={disabled}
+          onMouseDown={(e) => { e.preventDefault(); format('fontSize', '2'); }}
+          className={`${TOOLBAR_BTN} text-xs`}
+          title="Chữ nhỏ"
+        >
+          A-
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onMouseDown={(e) => { e.preventDefault(); format('fontSize', '3'); }}
+          className={`${TOOLBAR_BTN} text-xs`}
+          title="Chữ thường"
+        >
+          A
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onMouseDown={(e) => { e.preventDefault(); format('fontSize', '5'); }}
+          className={`${TOOLBAR_BTN} text-xs font-semibold`}
+          title="Chữ lớn"
+        >
+          A+
+        </button>
+        <div className="w-px h-4 bg-slate-300 mx-1" />
+        <button
+          type="button"
+          disabled={disabled}
+          onMouseDown={(e) => { e.preventDefault(); applyLetterSpacing(); }}
+          className={`${TOOLBAR_BTN} text-xs`}
+          title="Giãn cách chữ (chọn chữ trước)"
+        >
+          A↔
+        </button>
+      </div>
+      <div
+        ref={editorRef}
+        contentEditable={!disabled}
+        onInput={(e) => {
+          const html = (e.target as HTMLDivElement).innerHTML;
+          onChange(html === '<br>' ? '' : html);
+        }}
+        data-placeholder={placeholder}
+        className="min-h-[100px] px-4 py-3 text-sm text-slate-800 focus:outline-none"
+        suppressContentEditableWarning
+      />
+    </div>
+  );
+};
 
 interface PostCommentsProps {
   postId: string;
@@ -259,9 +390,16 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete }) => {
 
       {/* Post content */}
       <div className="px-4 pb-3">
-        <p className="text-slate-800 text-sm whitespace-pre-wrap break-words leading-relaxed">
-          {post.content}
-        </p>
+        {HTML_TAG_RE.test(post.content) ? (
+          <div
+            className="text-slate-800 text-sm break-words leading-relaxed [&_b]:font-bold [&_i]:italic [&_u]:underline"
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.content) }}
+          />
+        ) : (
+          <p className="text-slate-800 text-sm whitespace-pre-wrap break-words leading-relaxed">
+            {post.content}
+          </p>
+        )}
       </div>
 
       {/* Image */}
@@ -296,6 +434,21 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete }) => {
               className="w-full rounded-xl max-h-80 border border-slate-100"
             />
           )}
+        </div>
+      )}
+
+      {/* PDF attachment */}
+      {post.pdfUrl && (
+        <div className="px-4 pb-3">
+          <a
+            href={post.pdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-3 py-2.5 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700 hover:bg-rose-100 transition-colors"
+          >
+            <FileText size={16} className="flex-shrink-0" />
+            <span className="flex-1 truncate">{post.pdfName || 'Tài liệu PDF'}</span>
+          </a>
         </div>
       )}
 
@@ -355,8 +508,11 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const currentUser = getCurrentUser();
 
   useEffect(() => {
@@ -374,22 +530,37 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
     setSubmitting(true);
     setSubmitError(null);
     try {
+      let pdfUrl: string | null = null;
+      let pdfName: string | null = null;
+      if (pdfFile && storage) {
+        setUploadingPdf(true);
+        const safeName = pdfFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const fileRef = storageRef(storage, `bulletin_pdfs/${Date.now()}_${safeName}`);
+        await uploadBytes(fileRef, pdfFile);
+        pdfUrl = await getDownloadURL(fileRef);
+        pdfName = pdfFile.name;
+        setUploadingPdf(false);
+      }
       await addDoc(collection(db, 'bulletin_posts'), {
         author: currentUser.displayName,
         authorUsername: currentUser.username,
         content: content.trim(),
         imageUrl: imageUrl.trim() || null,
         videoUrl: videoUrl.trim() || null,
+        pdfUrl: pdfUrl,
+        pdfName: pdfName,
         createdAt: serverTimestamp(),
         reactions: { like: [], dislike: [], surprised: [], heart: [], laugh: [] },
       });
       setContent('');
       setImageUrl('');
       setVideoUrl('');
+      setPdfFile(null);
       setShowForm(false);
     } catch (err) {
       console.error('Error creating post:', err);
       setSubmitError('Không thể đăng bài. Vui lòng thử lại.');
+      setUploadingPdf(false);
     } finally {
       setSubmitting(false);
     }
@@ -430,6 +601,7 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
                 setContent('');
                 setImageUrl('');
                 setVideoUrl('');
+                setPdfFile(null);
                 setSubmitError(null);
               }}
               className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
@@ -443,14 +615,10 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
               <p className="text-xs text-rose-600 font-medium">{submitError}</p>
             )}
 
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
+            <RichTextEditor
+              onChange={setContent}
               placeholder="Nội dung bài đăng (cập nhật tin tức, thông báo...)..."
-              rows={4}
-              required
               disabled={submitting}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm resize-none"
             />
 
             <div className="flex items-center gap-2">
@@ -477,6 +645,37 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
               />
             </div>
 
+            <div className="flex items-center gap-2">
+              <FileText size={16} className="text-slate-400 flex-shrink-0" />
+              <input
+                ref={pdfInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                disabled={submitting}
+                onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
+                className="hidden"
+              />
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => pdfInputRef.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <Upload size={14} />
+                {pdfFile ? pdfFile.name : 'Đính kèm PDF (tuỳ chọn)'}
+              </button>
+              {pdfFile && (
+                <button
+                  type="button"
+                  onClick={() => { setPdfFile(null); if (pdfInputRef.current) pdfInputRef.current.value = ''; }}
+                  className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
+                  title="Xóa file PDF"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
@@ -485,6 +684,7 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
                   setContent('');
                   setImageUrl('');
                   setVideoUrl('');
+                  setPdfFile(null);
                   setSubmitError(null);
                 }}
                 disabled={submitting}
@@ -498,7 +698,7 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
                 className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 text-white px-5 py-2 rounded-xl text-sm font-medium transition-all active:scale-95"
               >
                 <Send size={16} />
-                {submitting ? 'Đang đăng...' : 'Đăng bài'}
+                {uploadingPdf ? 'Đang tải PDF...' : submitting ? 'Đang đăng...' : 'Đăng bài'}
               </button>
             </div>
           </form>
