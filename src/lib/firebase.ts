@@ -1,6 +1,7 @@
 
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const getFirebaseConfig = () => {
   // Priority 1: Environment Variables from Vite (set via .env file)
@@ -36,16 +37,19 @@ const config = getFirebaseConfig();
 
 // Initialize Firebase only if config is available
 let dbInstance: any = null;
+let storageInstance: any = null;
 
 if (config) {
   try {
     const app = !getApps().length ? initializeApp(config) : getApp();
     dbInstance = getFirestore(app);
+    storageInstance = getStorage(app);
   } catch (e) {
     console.error("Firebase initialization failed", e);
   }
 }
 
 export const db = dbInstance;
+export const storage = storageInstance;
 export const isFirebaseConfigured = !!dbInstance;
 
