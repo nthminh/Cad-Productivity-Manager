@@ -77,6 +77,47 @@ function getYoutubeEmbedUrl(url: string): string | null {
 
 const HTML_TAG_RE = /(<[a-z]+[\s/>]|<\/[a-z]+>)/i;
 
+async function compressImage(file: File, maxWidth = 1200, quality = 0.75): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(file);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            const baseName = file.name.replace(/\.[^.]+$/, '');
+            resolve(new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' }));
+          } else {
+            resolve(file);
+          }
+        },
+        'image/jpeg',
+        quality,
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+    img.src = url;
+  });
+}
+
 function sanitizeHtml(html: string): string {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   doc.querySelectorAll('script, style, iframe, object, embed, form').forEach((el) => el.remove());
@@ -458,24 +499,26 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
             <p className="text-xs text-slate-400">{formatTime(post.createdAt)}</p>
           </div>
         </div>
-        {canDelete && (
-          <button
-            onClick={() => onDelete(post.id)}
-            className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-            title="Xóa bài đăng"
-          >
-            <Trash2 size={16} />
-          </button>
-        )}
-        {canEdit && !isEditing && (
-          <button
-            onClick={startEdit}
-            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-            title="Chỉnh sửa bài đăng"
-          >
-            <Pencil size={16} />
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {canEdit && !isEditing && (
+            <button
+              onClick={startEdit}
+              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+              title="Chỉnh sửa bài đăng"
+            >
+              <Pencil size={16} />
+            </button>
+          )}
+          {canDelete && (
+            <button
+              onClick={() => onDelete(post.id)}
+              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+              title="Xóa bài đăng"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Post content / inline edit form */}
@@ -666,10 +709,9 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
     if (!storage) throw new Error('Storage not available');
     setUploadingImage(true);
     try {
-      const mimeType = file.type;
-      const ext = mimeType && mimeType.includes('/') ? mimeType.split('/')[1].split('+')[0] : 'png';
-      const fileRef = storageRef(storage, `bulletin_images/${crypto.randomUUID()}.${ext}`);
-      await uploadBytes(fileRef, file);
+      const compressed = await compressImage(file);
+      const fileRef = storageRef(storage, `bulletin_images/${crypto.randomUUID()}.jpg`);
+      await uploadBytes(fileRef, compressed);
       return await getDownloadURL(fileRef);
     } finally {
       setUploadingImage(false);
