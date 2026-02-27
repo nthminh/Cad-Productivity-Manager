@@ -29,11 +29,14 @@ import { EngineerList } from './components/EngineerList';
 import { SalaryPage } from './components/SalaryPage';
 import { ReportsPage } from './components/ReportsPage';
 import { SettingsPage } from './components/SettingsPage';
+import { LoginGate } from './components/LoginGate';
 import { db, isFirebaseConfigured } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { Task } from './types/database.types';
+import { isAuthenticated } from './lib/auth';
 
 export default function App() {
+  const [authenticated, setAuthenticated] = useState(isAuthenticated());
   const [activeTab, setActiveTab] = useState('dashboard');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,6 +92,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+      {!authenticated && (
+        <LoginGate onAuthenticated={() => setAuthenticated(true)} />
+      )}
+      {authenticated && (
+      <>
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
@@ -280,6 +288,8 @@ export default function App() {
 
       {showTaskForm && (
         <TaskForm onClose={() => setShowTaskForm(false)} onSuccess={() => setShowTaskForm(false)} />
+      )}
+      </>
       )}
     </div>
   );
