@@ -18,6 +18,7 @@ export const EditTaskForm: React.FC<EditTaskFormProps> = ({ task, onClose, onSuc
     project_id: task.project_id,
     difficulty: task.difficulty,
     target_hours: task.target_hours,
+    target_hours_period: task.target_hours_period ?? 'ngày',
     actual_hours: task.actual_hours,
     cost: task.cost ?? 0,
     status: task.status,
@@ -132,15 +133,30 @@ export const EditTaskForm: React.FC<EditTaskFormProps> = ({ task, onClose, onSuc
               <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
                 <Target size={14} /> Giờ mục tiêu (Target)
               </label>
-              <input
-                type="number"
-                required
-                min="0.5"
-                step="0.5"
-                value={formData.target_hours}
-                onChange={e => setFormData({...formData, target_hours: parseFloat(e.target.value)})}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  required
+                  min="0.5"
+                  step="0.5"
+                  value={formData.target_hours}
+                  onChange={e => setFormData({...formData, target_hours: parseFloat(e.target.value)})}
+                  className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                />
+                <div className="relative">
+                  <select
+                    value={formData.target_hours_period}
+                    onChange={e => setFormData({...formData, target_hours_period: e.target.value as 'ngày' | 'tuần' | 'tháng' | 'năm'})}
+                    className="h-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none pr-8"
+                  >
+                    <option value="ngày">/ Ngày</option>
+                    <option value="tuần">/ Tuần</option>
+                    <option value="tháng">/ Tháng</option>
+                    <option value="năm">/ Năm</option>
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
