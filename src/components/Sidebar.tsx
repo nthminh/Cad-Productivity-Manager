@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ClipboardList, HardHat, X, Users, DollarSign, BarChart3, Settings } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, X, Users, DollarSign, BarChart3, Settings } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { type UserRole, getPermissions } from '../lib/permissions';
@@ -49,11 +49,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
       >
         <div className="p-6 flex items-center justify-between border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="bg-emerald-500 p-2 rounded-lg">
-              <HardHat className="text-white" size={24} />
-            </div>
+            <svg width="40" height="40" viewBox="0 0 40 40" className="rounded-lg flex-shrink-0" role="img" aria-label="DG Logo">
+              <rect width="40" height="40" rx="8" fill="white" />
+              <text x="2" y="30" fontFamily="Arial Black, sans-serif" fontSize="28" fontWeight="900" fill="#dc2626">D</text>
+              <text x="16" y="30" fontFamily="Arial Black, sans-serif" fontSize="28" fontWeight="900" fill="#111827">G</text>
+            </svg>
             <div>
-              <h1 className="text-white font-bold text-lg leading-tight">PM</h1>
+              <h1 className="text-white font-bold text-lg leading-tight">DG</h1>
               <p className="text-xs text-slate-500">Productivity Manager</p>
             </div>
           </div>
