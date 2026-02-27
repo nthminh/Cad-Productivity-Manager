@@ -1,0 +1,296 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Send, Trash2, MessageSquare, AtSign } from 'lucide-react';
+import { db } from '../lib/firebase';
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp,
+  Timestamp,
+} from 'firebase/firestore';
+import { getCurrentUser, getUsers } from '../lib/auth';
+
+interface TaskComment {
+  id: string;
+  task_id: string;
+  text: string;
+  sender: string;
+  username: string;
+  createdAt: Timestamp | null;
+  mentions?: string[];
+}
+
+function renderTextWithMentions(text: string, currentUsername?: string) {
+  const parts = text.split(/(@\w+)/g);
+  return parts.map((part, i) => {
+    if (/^@\w+$/.test(part)) {
+      const isSelf = currentUsername && part === `@${currentUsername}`;
+      return (
+        <span
+          key={i}
+          className={`font-semibold ${isSelf ? 'bg-yellow-200 text-yellow-800 rounded px-0.5' : 'text-emerald-600'}`}
+        >
+          {part}
+        </span>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
+function extractMentions(text: string): string[] {
+  const matches = text.match(/@(\w+)/g);
+  return matches ? matches.map((m) => m.slice(1)) : [];
+}
+
+interface Props {
+  taskId: string;
+  taskName: string;
+  onClose: () => void;
+}
+
+export const TaskCommentSection: React.FC<Props> = ({ taskId, taskName, onClose }) => {
+  const [comments, setComments] = useState<TaskComment[]>([]);
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [allUsers, setAllUsers] = useState<{ username: string; displayName: string }[]>([]);
+
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const currentUser = getCurrentUser();
+
+  useEffect(() => {
+    setAllUsers(getUsers().map((u) => ({ username: u.username, displayName: u.displayName })));
+  }, []);
+
+  useEffect(() => {
+    if (!db) return;
+    const q = query(
+      collection(db, 'task_comments'),
+      where('task_id', '==', taskId),
+      orderBy('createdAt', 'asc'),
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setComments(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as TaskComment)));
+    });
+    return () => unsubscribe();
+  }, [taskId]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [comments]);
+
+  const filteredUsers =
+    mentionQuery !== null
+      ? allUsers.filter(
+          (u) =>
+            u.username.toLowerCase().includes(mentionQuery) ||
+            u.displayName.toLowerCase().includes(mentionQuery),
+        )
+      : [];
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInput(val);
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+    const match = val.match(/@(\w*)$/);
+    if (match) {
+      setMentionQuery(match[1].toLowerCase());
+    } else {
+      setMentionQuery(null);
+    }
+  };
+
+  const insertMention = (username: string) => {
+    const newInput = input.replace(/@(\w*)$/, `@${username} `);
+    setInput(newInput);
+    setMentionQuery(null);
+    inputRef.current?.focus();
+  };
+
+  const sendComment = async () => {
+    const text = input.trim();
+    if (!text || !db || !currentUser) return;
+    setSending(true);
+    setSendError(null);
+    try {
+      await addDoc(collection(db, 'task_comments'), {
+        task_id: taskId,
+        text,
+        sender: currentUser.displayName,
+        username: currentUser.username,
+        createdAt: serverTimestamp(),
+        mentions: extractMentions(text),
+      });
+      setInput('');
+      if (inputRef.current) inputRef.current.style.height = 'auto';
+      setMentionQuery(null);
+    } catch (err) {
+      console.error('Error sending comment:', err);
+      setSendError('Gửi bình luận thất bại. Vui lòng thử lại.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleDelete = async (commentId: string) => {
+    if (!db || !window.confirm('Xóa bình luận này?')) return;
+    try {
+      await deleteDoc(doc(db, 'task_comments', commentId));
+    } catch (err) {
+      console.error('Delete error:', err);
+      setSendError('Xóa bình luận thất bại.');
+    }
+  };
+
+  const formatTime = (ts: Timestamp | null) => {
+    if (!ts) return '';
+    const d = ts.toDate();
+    return d.toLocaleString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const canDelete = (comment: TaskComment) =>
+    comment.username === currentUser?.username || currentUser?.role === 'admin';
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Panel */}
+      <div className="relative flex flex-col w-full max-w-md bg-white shadow-2xl h-full">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200 bg-slate-50 flex-shrink-0">
+          <div className="bg-emerald-500 p-2 rounded-lg flex-shrink-0">
+            <MessageSquare className="text-white" size={18} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-slate-900 text-sm">Bình luận</h3>
+            <p className="text-xs text-slate-500 truncate">{taskName}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Comments list */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {comments.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
+              <MessageSquare size={36} className="opacity-30" />
+              <p className="text-sm">Chưa có bình luận nào. Hãy là người đầu tiên!</p>
+            </div>
+          )}
+          {comments.map((comment) => {
+            const isMe = comment.username === currentUser?.username;
+            return (
+              <div key={comment.id} className={`flex gap-2 group ${isMe ? 'flex-row-reverse' : ''}`}>
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                    isMe ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {comment.sender.charAt(0).toUpperCase()}
+                </div>
+                <div className={`flex flex-col gap-0.5 max-w-[80%] ${isMe ? 'items-end' : ''}`}>
+                  <div className="flex items-center gap-1.5">
+                    {!isMe && (
+                      <span className="text-xs font-semibold text-slate-600">{comment.sender}</span>
+                    )}
+                    <span className="text-[10px] text-slate-400">{formatTime(comment.createdAt)}</span>
+                    {canDelete(comment) && (
+                      <button
+                        onClick={() => handleDelete(comment.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-rose-50 text-slate-300 hover:text-rose-500"
+                        title="Xóa bình luận"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    )}
+                  </div>
+                  <div
+                    className={`px-3 py-2 rounded-2xl text-sm break-words ${
+                      isMe
+                        ? 'bg-emerald-500 text-white rounded-tr-sm'
+                        : 'bg-slate-100 text-slate-800 rounded-tl-sm'
+                    }`}
+                  >
+                    {renderTextWithMentions(comment.text, currentUser?.username)}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Input area */}
+        <div className="border-t border-slate-100 flex-shrink-0 p-4 space-y-2">
+          {/* @ mention dropdown */}
+          {mentionQuery !== null && filteredUsers.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+              {filteredUsers.slice(0, 6).map((u) => (
+                <button
+                  key={u.username}
+                  onClick={() => insertMention(u.username)}
+                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-emerald-50 text-left text-sm"
+                >
+                  <AtSign size={14} className="text-emerald-500 flex-shrink-0" />
+                  <span className="font-medium text-slate-800">{u.displayName}</span>
+                  <span className="text-slate-400 text-xs">@{u.username}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {sendError && <p className="text-xs text-rose-600 font-medium">{sendError}</p>}
+
+          <div className="flex gap-2 items-end">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendComment();
+                }
+                if (e.key === 'Escape') {
+                  setMentionQuery(null);
+                }
+              }}
+              placeholder="Viết bình luận... (dùng @ để nhắc ai đó)"
+              disabled={!db || !currentUser || sending}
+              rows={1}
+              className="flex-1 min-w-0 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm resize-none overflow-hidden"
+            />
+            <button
+              onClick={sendComment}
+              disabled={sending || !input.trim() || !db || !currentUser}
+              className="flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 text-white p-2.5 rounded-xl font-medium transition-all active:scale-95 flex-shrink-0"
+            >
+              <Send size={18} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
