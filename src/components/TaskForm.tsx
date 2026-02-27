@@ -17,7 +17,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
     project_id: 'default-project',
     difficulty: 3,
     target_hours: 8,
-    target_hours_period: 'ngày' as 'ngày' | 'tuần' | 'tháng' | 'năm',
+    target_hours_period: 'giờ' as 'giờ' | 'ngày' | 'tuần' | 'tháng' | 'năm',
     actual_hours: 0,
     cost: 0,
     status: 'Đang làm',
@@ -142,7 +142,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-                <Target size={14} /> Giờ mục tiêu (Target)
+                <Target size={14} /> Thời gian mục tiêu (Target)
               </label>
               <div className="flex gap-2">
                 <input
@@ -157,9 +157,10 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
                 <div className="relative">
                   <select
                     value={formData.target_hours_period}
-                    onChange={e => setFormData({...formData, target_hours_period: e.target.value as 'ngày' | 'tuần' | 'tháng' | 'năm'})}
+                    onChange={e => setFormData({...formData, target_hours_period: e.target.value as 'giờ' | 'ngày' | 'tuần' | 'tháng' | 'năm'})}
                     className="h-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all appearance-none pr-8"
                   >
+                    <option value="giờ">Giờ</option>
                     <option value="ngày">/ Ngày</option>
                     <option value="tuần">/ Tuần</option>
                     <option value="tháng">/ Tháng</option>

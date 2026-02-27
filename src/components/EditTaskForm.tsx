@@ -18,7 +18,7 @@ export const EditTaskForm: React.FC<EditTaskFormProps> = ({ task, onClose, onSuc
     project_id: task.project_id,
     difficulty: task.difficulty,
     target_hours: task.target_hours,
-    target_hours_period: task.target_hours_period ?? 'ngày',
+    target_hours_period: task.target_hours_period ?? 'giờ',
     actual_hours: task.actual_hours,
     cost: task.cost ?? 0,
     status: task.status,
@@ -131,7 +131,7 @@ export const EditTaskForm: React.FC<EditTaskFormProps> = ({ task, onClose, onSuc
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-                <Target size={14} /> Giờ mục tiêu (Target)
+                <Target size={14} /> Thời gian mục tiêu (Target)
               </label>
               <div className="flex gap-2">
                 <input
@@ -146,9 +146,10 @@ export const EditTaskForm: React.FC<EditTaskFormProps> = ({ task, onClose, onSuc
                 <div className="relative">
                   <select
                     value={formData.target_hours_period}
-                    onChange={e => setFormData({...formData, target_hours_period: e.target.value as 'ngày' | 'tuần' | 'tháng' | 'năm'})}
+                    onChange={e => setFormData({...formData, target_hours_period: e.target.value as 'giờ' | 'ngày' | 'tuần' | 'tháng' | 'năm'})}
                     className="h-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none pr-8"
                   >
+                    <option value="giờ">Giờ</option>
                     <option value="ngày">/ Ngày</option>
                     <option value="tuần">/ Tuần</option>
                     <option value="tháng">/ Tháng</option>
