@@ -150,10 +150,10 @@ export const EditTaskForm: React.FC<EditTaskFormProps> = ({ task, onClose, onSuc
                     className="h-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none pr-8"
                   >
                     <option value="giờ">Giờ</option>
-                    <option value="ngày">/ Ngày</option>
-                    <option value="tuần">/ Tuần</option>
-                    <option value="tháng">/ Tháng</option>
-                    <option value="năm">/ Năm</option>
+                    <option value="ngày">Ngày</option>
+                    <option value="tuần">Tuần</option>
+                    <option value="tháng">Tháng</option>
+                    <option value="năm">Năm</option>
                   </select>
                   <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
