@@ -91,10 +91,15 @@ function exportToCSV(tasks: Task[]) {
     t.drive_link ?? '',
     new Date(t.created_at).toLocaleDateString('vi-VN'),
   ]);
-  const csvContent = '\uFEFF' + [headers, ...rows]
+  const csvRows = [headers, ...rows]
     .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    .join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    .join('\r\n');
+  const encoded = new TextEncoder().encode(csvRows);
+  const BOM = new Uint8Array([0xEF, 0xBB, 0xBF]);
+  const combined = new Uint8Array(BOM.length + encoded.length);
+  combined.set(BOM);
+  combined.set(encoded, BOM.length);
+  const blob = new Blob([combined], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

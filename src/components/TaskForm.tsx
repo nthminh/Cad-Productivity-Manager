@@ -143,18 +143,15 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
               <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
                 <Target size={14} /> Thời gian mục tiêu (Target)
               </label>
-              <div className="flex gap-2 items-center">
-                <input
-                  type="number"
-                  required
-                  min="0.5"
-                  step="0.5"
-                  value={formData.target_hours}
-                  onChange={e => setFormData({...formData, target_hours: parseFloat(e.target.value)})}
-                  className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
-                />
-                <span className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 font-medium">Giờ</span>
-              </div>
+              <input
+                type="number"
+                required
+                min="0.5"
+                step="0.5"
+                value={formData.target_hours}
+                onChange={e => setFormData({...formData, target_hours: parseFloat(e.target.value)})}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
