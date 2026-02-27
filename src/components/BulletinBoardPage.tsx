@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Send, Trash2, Pencil, MessageSquare, Image as ImageIcon, Video, X, ChevronDown, ChevronUp, Newspaper, Bold, Italic, Underline, FileText, Upload } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Plus, Send, Trash2, Pencil, MessageSquare, Image as ImageIcon, Video, X, ChevronDown, ChevronUp, Newspaper, Bold, Italic, Underline, FileText, Upload, Search } from 'lucide-react';
 import { db, storage } from '../lib/firebase';
 import {
   collection,
@@ -77,7 +77,7 @@ function getYoutubeEmbedUrl(url: string): string | null {
 
 const HTML_TAG_RE = /(<[a-z]+[\s/>]|<\/[a-z]+>)/i;
 
-async function compressImage(file: File, maxWidth = 1200, quality = 0.75): Promise<File> {
+async function compressImage(file: File, maxWidth = 900, quality = 0.65): Promise<File> {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -177,30 +177,33 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ onChange, placeholder, 
     e.preventDefault();
     const file = imageItem.getAsFile();
     if (!file) return;
-    const placeholderId = `img-upload-${crypto.randomUUID()}`;
+    // Show local preview immediately so user sees the image without waiting for upload
+    const localUrl = URL.createObjectURL(file);
+    const imgId = `img-paste-${crypto.randomUUID()}`;
     document.execCommand(
       'insertHTML',
       false,
-      `<span id="${placeholderId}" style="color:#94a3b8;font-size:0.8em">[Đang tải ảnh...]</span>`,
+      `<img id="${imgId}" src="${localUrl}" alt="Ảnh dán" style="max-width:100%;border-radius:8px;margin:4px 0;opacity:0.75" />`,
     );
     onChange(editorRef.current?.innerHTML ?? '');
     try {
       const url = await onImagePaste(file);
-      const placeholder = editorRef.current?.querySelector(`#${placeholderId}`);
-      if (placeholder) {
-        const img = document.createElement('img');
-        img.src = url;
-        img.alt = 'Ảnh dán';
-        img.style.cssText = 'max-width:100%;border-radius:8px;margin:4px 0';
-        placeholder.replaceWith(img);
-      } else {
-        document.execCommand('insertImage', false, url);
+      URL.revokeObjectURL(localUrl);
+      const imgEl = editorRef.current?.querySelector(`#${imgId}`) as HTMLImageElement | null;
+      if (imgEl) {
+        imgEl.src = url;
+        imgEl.style.opacity = '1';
+        imgEl.removeAttribute('id');
       }
     } catch {
-      const placeholder = editorRef.current?.querySelector(`#${placeholderId}`);
-      if (placeholder) {
-        (placeholder as HTMLElement).textContent = '[Tải ảnh thất bại]';
-        (placeholder as HTMLElement).style.color = '#ef4444';
+      URL.revokeObjectURL(localUrl);
+      const imgEl = editorRef.current?.querySelector(`#${imgId}`);
+      if (imgEl) {
+        const errSpan = document.createElement('span');
+        errSpan.style.color = '#ef4444';
+        errSpan.style.fontSize = '0.8em';
+        errSpan.textContent = '[Tải ảnh thất bại]';
+        imgEl.replaceWith(errSpan);
       }
     }
     onChange(editorRef.current?.innerHTML ?? '');
@@ -740,6 +743,7 @@ interface BulletinBoardPageProps {
 
 export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }) => {
   const [posts, setPosts] = useState<BulletinPost[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -753,6 +757,18 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const currentUser = getCurrentUser();
+
+  const filteredPosts = useMemo(() => {
+    if (!searchQuery) return posts;
+    const q = searchQuery.toLowerCase();
+    return posts.filter((p) => {
+      const textContent = p.content.replace(/<[^>]*>/g, ' ');
+      return (
+        textContent.toLowerCase().includes(q) ||
+        p.author.toLowerCase().includes(q)
+      );
+    });
+  }, [posts, searchQuery]);
 
   const handleImagePaste = async (file: File): Promise<string> => {
     if (!storage) throw new Error('Storage not available');
@@ -1017,6 +1033,26 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
         </div>
       )}
 
+      {/* Search bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Tìm kiếm bài đăng..."
+          className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm shadow-sm"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+          >
+            <X size={15} />
+          </button>
+        )}
+      </div>
+
       {/* Post feed */}
       {posts.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
@@ -1025,7 +1061,14 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
         </div>
       )}
 
-      {posts.map((post) => (
+      {posts.length > 0 && filteredPosts.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
+          <Search size={32} className="opacity-20" />
+          <p className="text-sm">Không tìm thấy bài đăng phù hợp.</p>
+        </div>
+      )}
+
+      {filteredPosts.map((post) => (
         <PostCard
           key={post.id}
           post={post}
