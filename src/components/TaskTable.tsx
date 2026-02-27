@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ExternalLink, Eye, MoreVertical, Star, Download, Search, Filter, FileDown, X, MessageSquare } from 'lucide-react';
+import { ExternalLink, Eye, MoreVertical, Star, Download, Search, Filter, FileDown, FileSpreadsheet, X, MessageSquare } from 'lucide-react';
+import ExcelJS from 'exceljs';
 import { Task } from '../types/database.types';
 import { TaskContextMenu } from './TaskContextMenu';
 import { EditTaskForm } from './EditTaskForm';
@@ -104,6 +105,81 @@ function exportToCSV(tasks: Task[]) {
   const link = document.createElement('a');
   link.href = url;
   link.download = `cad-tasks-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+async function exportToExcel(tasks: Task[]) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'CAD Productivity Manager';
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet('Dự án CAD');
+
+  sheet.columns = [
+    { header: 'Tên dự án', key: 'drawing_name', width: 28 },
+    { header: 'Thông tin dự án', key: 'description', width: 32 },
+    { header: 'Kỹ sư', key: 'engineer', width: 18 },
+    { header: 'Độ khó', key: 'difficulty', width: 12 },
+    { header: 'Trạng thái', key: 'status', width: 16 },
+    { header: 'Hạn chót', key: 'deadline', width: 14 },
+    { header: 'Giờ mục tiêu', key: 'target_hours', width: 14 },
+    { header: 'Giờ thực tế', key: 'actual_hours', width: 13 },
+    { header: 'Năng suất (%)', key: 'productivity', width: 15 },
+    { header: 'Giá thành (VNĐ)', key: 'cost', width: 20 },
+    { header: 'Link Drive', key: 'drive_link', width: 32 },
+    { header: 'Ngày tạo', key: 'created_at', width: 14 },
+  ];
+
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF059669' } };
+  headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+  headerRow.height = 22;
+
+  tasks.forEach((t, index) => {
+    const productivity = t.actual_hours > 0
+      ? parseFloat(((t.target_hours / t.actual_hours) * 100).toFixed(1))
+      : null;
+    const row = sheet.addRow({
+      drawing_name: t.drawing_name,
+      description: t.description ?? '',
+      engineer: t.engineer_name,
+      difficulty: t.difficulty,
+      status: t.status,
+      deadline: t.deadline ?? '',
+      target_hours: t.target_hours,
+      actual_hours: Math.round(t.actual_hours * 10) / 10,
+      productivity: productivity,
+      cost: t.cost ?? '',
+      drive_link: t.drive_link ?? '',
+      created_at: new Date(t.created_at).toLocaleDateString('vi-VN'),
+    });
+    row.alignment = { vertical: 'middle', wrapText: false };
+    if (index % 2 === 1) {
+      row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } };
+    }
+  });
+
+  sheet.eachRow((row) => {
+    row.eachCell((cell) => {
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        right: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+      };
+    });
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `cad-tasks-${new Date().toISOString().slice(0, 10)}.xlsx`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -288,6 +364,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
             >
               <FileDown size={16} />
               <span className="hidden sm:inline">Xuất CSV</span>
+            </button>
+            <button
+              onClick={() => exportToExcel(filteredTasks).catch(err => console.error('Excel export failed:', err))}
+              className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white hover:bg-green-700 rounded-xl text-sm font-medium transition-colors"
+              title="Xuất Excel"
+            >
+              <FileSpreadsheet size={16} />
+              <span className="hidden sm:inline">Xuất Excel</span>
             </button>
           </div>
         </div>
