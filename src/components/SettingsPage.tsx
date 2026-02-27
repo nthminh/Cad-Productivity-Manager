@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, CheckCircle2, AlertCircle, Trash2, ClipboardPaste, KeyRound, Eye, EyeOff, LogOut, UserPlus, Users, ShieldCheck } from 'lucide-react';
+import { Save, CheckCircle2, AlertCircle, Trash2, ClipboardPaste, KeyRound, Eye, EyeOff, LogOut, UserPlus, Users, ShieldCheck, Pencil, X } from 'lucide-react';
 import { isFirebaseConfigured } from '../lib/firebase';
 import { isUsingDefaultPassword, logout, getCurrentUser, updateUser, getUsers, addUser, removeUser, type AppUser } from '../lib/auth';
 import { type UserRole, ROLE_LABELS, ROLE_BADGE_COLORS } from '../lib/permissions';
@@ -105,6 +105,15 @@ export const SettingsPage: React.FC = () => {
   const [addUserError, setAddUserError] = useState<string | null>(null);
   const [addUserSaved, setAddUserSaved] = useState(false);
   const [addUserLoading, setAddUserLoading] = useState(false);
+
+  // Edit user state (admin only)
+  const [editingUsername, setEditingUsername] = useState<string | null>(null);
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editRole, setEditRole] = useState<UserRole>('engineer');
+  const [editPassword, setEditPassword] = useState('');
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [editUserError, setEditUserError] = useState<string | null>(null);
+  const [editUserLoading, setEditUserLoading] = useState(false);
 
   useEffect(() => {
     isUsingDefaultPassword().then(setUsingDefaultPwd);
@@ -219,6 +228,51 @@ export const SettingsPage: React.FC = () => {
     if (!window.confirm(`Bạn có chắc muốn xóa người dùng "${username}"?`)) return;
     removeUser(username);
     setUsers(getUsers());
+  };
+
+  const openEditUser = (u: AppUser) => {
+    setEditingUsername(u.username);
+    setEditDisplayName(u.displayName);
+    setEditRole(u.role);
+    setEditPassword('');
+    setShowEditPassword(false);
+    setEditUserError(null);
+    setShowAddUser(false);
+  };
+
+  const handleEditButtonClick = (u: AppUser) => {
+    if (editingUsername === u.username) {
+      setEditingUsername(null);
+    } else {
+      openEditUser(u);
+    }
+  };
+
+  const handleEditUser = async () => {
+    setEditUserError(null);
+    if (!editDisplayName.trim()) {
+      setEditUserError('Tên hiển thị là bắt buộc.');
+      return;
+    }
+    if (editPassword && editPassword.length < 8) {
+      setEditUserError('Mật khẩu phải có ít nhất 8 ký tự.');
+      return;
+    }
+    setEditUserLoading(true);
+    try {
+      const updates: { displayName?: string; role?: UserRole; password?: string } = {
+        displayName: editDisplayName.trim(),
+        role: editRole,
+      };
+      if (editPassword) updates.password = editPassword;
+      await updateUser(editingUsername!, updates);
+      setEditingUsername(null);
+      setUsers(getUsers());
+    } catch (err: unknown) {
+      setEditUserError(err instanceof Error ? err.message : 'Có lỗi xảy ra.');
+    } finally {
+      setEditUserLoading(false);
+    }
   };
 
   return (
@@ -429,7 +483,7 @@ export const SettingsPage: React.FC = () => {
               <h3 className="text-base font-bold text-slate-900">Quản lý người dùng</h3>
             </div>
             <button
-              onClick={() => { setShowAddUser((v) => !v); setAddUserError(null); }}
+              onClick={() => { setShowAddUser((v) => !v); setAddUserError(null); setEditingUsername(null); }}
               className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-all active:scale-95"
             >
               <UserPlus size={16} />
@@ -523,27 +577,102 @@ export const SettingsPage: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {users.map((u) => (
-                  <tr key={u.username} className="hover:bg-slate-50/50">
-                    <td className="px-4 py-3 text-sm font-mono text-slate-700">{u.username}</td>
-                    <td className="px-4 py-3 text-sm text-slate-700">{u.displayName}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${ROLE_BADGE_COLORS[u.role]}`}>
-                        <ShieldCheck size={11} className="inline mr-1" />
-                        {ROLE_LABELS[u.role]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {u.username !== currentSession?.username && (
-                        <button
-                          onClick={() => handleRemoveUser(u.username)}
-                          className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                          title="Xóa người dùng"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                  <React.Fragment key={u.username}>
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="px-4 py-3 text-sm font-mono text-slate-700">{u.username}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{u.displayName}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${ROLE_BADGE_COLORS[u.role]}`}>
+                          <ShieldCheck size={11} className="inline mr-1" />
+                          {ROLE_LABELS[u.role]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleEditButtonClick(u)}
+                            className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Chỉnh sửa người dùng"
+                          >
+                            {editingUsername === u.username ? <X size={15} /> : <Pencil size={15} />}
+                          </button>
+                          {u.username !== currentSession?.username && (
+                            <button
+                              onClick={() => handleRemoveUser(u.username)}
+                              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                              title="Xóa người dùng"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {editingUsername === u.username && (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-3 bg-blue-50/40">
+                          <div className="space-y-3">
+                            {editUserError && (
+                              <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">{editUserError}</div>
+                            )}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold text-slate-500">Tên hiển thị</label>
+                                <input
+                                  value={editDisplayName}
+                                  onChange={(e) => { setEditDisplayName(e.target.value); setEditUserError(null); }}
+                                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-sm transition-all"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold text-slate-500">Quyền</label>
+                                <select
+                                  value={editRole}
+                                  onChange={(e) => setEditRole(e.target.value as UserRole)}
+                                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-sm transition-all"
+                                >
+                                  {(Object.keys(ROLE_LABELS) as UserRole[]).map((r) => (
+                                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                            <div className="space-y-1 max-w-xs">
+                              <label className="text-xs font-semibold text-slate-500">Mật khẩu mới (tuỳ chọn)</label>
+                              <div className="relative">
+                                <input
+                                  type={showEditPassword ? 'text' : 'password'}
+                                  value={editPassword}
+                                  onChange={(e) => { setEditPassword(e.target.value); setEditUserError(null); }}
+                                  placeholder="Để trống nếu không đổi"
+                                  className="w-full px-3 py-2 pr-9 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-sm transition-all"
+                                />
+                                <button type="button" onClick={() => setShowEditPassword((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                  {showEditPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                onClick={handleEditUser}
+                                disabled={editUserLoading}
+                                className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 text-white px-4 py-2 rounded-xl font-bold text-sm transition-all active:scale-95"
+                              >
+                                <Save size={15} />
+                                {editUserLoading ? 'Đang lưu...' : 'Lưu'}
+                              </button>
+                              <button
+                                onClick={() => setEditingUsername(null)}
+                                className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                              >
+                                Hủy
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
