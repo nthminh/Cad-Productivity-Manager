@@ -91,17 +91,17 @@ function exportToCSV(tasks: Task[]) {
     t.drive_link ?? '',
     new Date(t.created_at).toLocaleDateString('vi-VN'),
   ]);
-  const csvContent = [headers, ...rows]
+  const csvContent = '\uFEFF' + [headers, ...rows]
     .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
     .join('\n');
-  const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
-  const encoder = new TextEncoder();
-  const blob = new Blob([bom, encoder.encode(csvContent)], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.download = `cad-tasks-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
   link.click();
+  document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
 
