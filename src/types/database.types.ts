@@ -13,7 +13,7 @@ export type Task = {
   description: string | null;
   difficulty: number;
   target_hours: number;
-  target_hours_period?: 'ngày' | 'tuần' | 'tháng' | 'năm';
+  target_hours_period?: 'giờ' | 'ngày' | 'tuần' | 'tháng' | 'năm';
   actual_hours: number;
   cost: number | null;
   status: 'Đang làm' | 'Chờ duyệt' | 'Hoàn thành' | 'Đã hủy' | 'Tạm hoãn';
