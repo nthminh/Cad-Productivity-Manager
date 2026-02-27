@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Send, Trash2, MessageSquare, Image as ImageIcon, Video, X, ChevronDown, ChevronUp, Newspaper, Bold, Italic, Underline, FileText, Upload } from 'lucide-react';
+import { Plus, Send, Trash2, Pencil, MessageSquare, Image as ImageIcon, Video, X, ChevronDown, ChevronUp, Newspaper, Bold, Italic, Underline, FileText, Upload } from 'lucide-react';
 import { db, storage } from '../lib/firebase';
 import {
   collection,
@@ -97,10 +97,18 @@ interface RichTextEditorProps {
   placeholder?: string;
   disabled?: boolean;
   onImagePaste?: (file: File) => Promise<string>;
+  initialHtml?: string;
 }
 
-const RichTextEditor: React.FC<RichTextEditorProps> = ({ onChange, placeholder, disabled, onImagePaste }) => {
+const RichTextEditor: React.FC<RichTextEditorProps> = ({ onChange, placeholder, disabled, onImagePaste, initialHtml }) => {
   const editorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (editorRef.current && initialHtml !== undefined) {
+      editorRef.current.innerHTML = sanitizeHtml(initialHtml);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const format = (command: string, value?: string) => {
     document.execCommand(command, false, value);
@@ -378,13 +386,47 @@ interface PostCardProps {
   post: BulletinPost;
   userRole: UserRole;
   onDelete: (id: string) => void;
+  onEdit: (id: string, updates: { content: string; imageUrl: string; videoUrl: string }) => Promise<void>;
 }
 
-const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete }) => {
+const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit }) => {
   const [showComments, setShowComments] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [editImageUrl, setEditImageUrl] = useState('');
+  const [editVideoUrl, setEditVideoUrl] = useState('');
+  const [saving, setSaving] = useState(false);
   const currentUser = getCurrentUser();
   const canDelete =
     post.authorUsername === currentUser?.username || userRole === 'admin';
+  const canEdit =
+    post.authorUsername === currentUser?.username || userRole === 'admin';
+
+  const startEdit = () => {
+    setEditContent(post.content);
+    setEditImageUrl(post.imageUrl ?? '');
+    setEditVideoUrl(post.videoUrl ?? '');
+    setIsEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+  };
+
+  const saveEdit = async () => {
+    if (!editContent.trim()) return;
+    setSaving(true);
+    try {
+      await onEdit(post.id, {
+        content: editContent.trim(),
+        imageUrl: editImageUrl.trim(),
+        videoUrl: editVideoUrl.trim(),
+      });
+      setIsEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const toggleReaction = async (reactionKey: keyof BulletinPost['reactions']) => {
     if (!db || !currentUser) return;
@@ -425,8 +467,71 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete }) => {
             <Trash2 size={16} />
           </button>
         )}
+        {canEdit && !isEditing && (
+          <button
+            onClick={startEdit}
+            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+            title="Chỉnh sửa bài đăng"
+          >
+            <Pencil size={16} />
+          </button>
+        )}
       </div>
 
+      {/* Post content / inline edit form */}
+      {isEditing ? (
+        <div className="px-4 pb-4 space-y-3">
+          <RichTextEditor
+            key={post.id}
+            onChange={setEditContent}
+            placeholder="Nội dung bài đăng..."
+            disabled={saving}
+            initialHtml={post.content}
+          />
+          <div className="flex items-center gap-2">
+            <ImageIcon size={16} className="text-slate-400 flex-shrink-0" />
+            <input
+              type="url"
+              value={editImageUrl}
+              onChange={(e) => setEditImageUrl(e.target.value)}
+              placeholder="URL ảnh (tuỳ chọn)"
+              disabled={saving}
+              className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Video size={16} className="text-slate-400 flex-shrink-0" />
+            <input
+              type="url"
+              value={editVideoUrl}
+              onChange={(e) => setEditVideoUrl(e.target.value)}
+              placeholder="URL video / YouTube (tuỳ chọn)"
+              disabled={saving}
+              className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm"
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={cancelEdit}
+              disabled={saving}
+              className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              onClick={saveEdit}
+              disabled={saving || !editContent.trim()}
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 text-white px-5 py-2 rounded-xl text-sm font-medium transition-all active:scale-95"
+            >
+              <Send size={16} />
+              {saving ? 'Đang lưu...' : 'Lưu'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Post content */}
       <div className="px-4 pb-3">
         {HTML_TAG_RE.test(post.content) ? (
@@ -533,6 +638,8 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete }) => {
           <PostComments postId={post.id} userRole={userRole} />
         </div>
       )}
+        </>
+      )}
     </div>
   );
 };
@@ -627,6 +734,18 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
     } catch (err) {
       console.error('Delete post error:', err);
     }
+  };
+
+  const handleEditPost = async (
+    postId: string,
+    updates: { content: string; imageUrl: string; videoUrl: string },
+  ) => {
+    if (!db) return;
+    await updateDoc(doc(db, 'bulletin_posts', postId), {
+      content: updates.content,
+      imageUrl: updates.imageUrl || null,
+      videoUrl: updates.videoUrl || null,
+    });
   };
 
   return (
@@ -774,6 +893,7 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
           post={post}
           userRole={userRole}
           onDelete={handleDeletePost}
+          onEdit={handleEditPost}
         />
       ))}
     </div>
