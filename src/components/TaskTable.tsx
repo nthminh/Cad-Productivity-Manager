@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ExternalLink, Eye, MoreVertical, Star, Download, Search, Filter, FileDown, X } from 'lucide-react';
+import { ExternalLink, Eye, MoreVertical, Star, Download, Search, Filter, FileDown, X, MessageSquare } from 'lucide-react';
 import { Task } from '../types/database.types';
 import { TaskContextMenu } from './TaskContextMenu';
 import { EditTaskForm } from './EditTaskForm';
+import { TaskCommentSection } from './TaskCommentSection';
 import { db } from '../lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 
 function ActualHoursInput({ task, onRefresh, readOnly }: { task: Task; onRefresh: () => void; readOnly?: boolean }) {
   const [value, setValue] = useState(String(task.actual_hours ?? 0));
@@ -84,9 +85,35 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [commentTaskId, setCommentTaskId] = useState<string | null>(null);
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [search, setSearch] = useState('');
   const [filterEngineer, setFilterEngineer] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+
+  useEffect(() => {
+    if (!db || tasks.length === 0) return;
+    const taskIds = tasks.map((t) => t.id);
+    // Firestore `in` query supports up to 30 items; split if needed
+    const chunks: string[][] = [];
+    for (let i = 0; i < taskIds.length; i += 30) chunks.push(taskIds.slice(i, i + 30));
+    const unsubs = chunks.map((chunk) => {
+      const q = query(collection(db, 'task_comments'), where('task_id', 'in', chunk));
+      return onSnapshot(q, (snapshot) => {
+        setCommentCounts((prev) => {
+          const updated = { ...prev };
+          // Reset counts for tasks in this chunk
+          chunk.forEach((id) => { updated[id] = 0; });
+          snapshot.docs.forEach((d) => {
+            const taskId = d.data().task_id as string;
+            updated[taskId] = (updated[taskId] ?? 0) + 1;
+          });
+          return updated;
+        });
+      });
+    });
+    return () => unsubs.forEach((u) => u());
+  }, [tasks]);
 
   const uniqueEngineers = useMemo(
     () => Array.from(new Set(tasks.map(t => t.engineer_name))).sort(),
@@ -212,13 +239,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Giá thành</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Giờ thực tế</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tải về</th>
+              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Bình luận</th>
               <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right whitespace-nowrap">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredTasks.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-6 py-10 text-center text-slate-400 text-sm">
+                <td colSpan={12} className="px-6 py-10 text-center text-slate-400 text-sm">
                   {hasActiveFilters ? 'Không tìm thấy dự án phù hợp với bộ lọc.' : 'Chưa có dự án nào.'}
                 </td>
               </tr>
@@ -311,6 +339,20 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     <span className="text-slate-400 text-xs italic">Chưa có</span>
                   )}
                 </td>
+                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                  <button
+                    onClick={() => setCommentTaskId(task.id)}
+                    className="relative flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 border border-slate-200 hover:border-emerald-300 rounded-lg text-xs font-medium transition-colors"
+                    title="Xem bình luận"
+                  >
+                    <MessageSquare size={14} />
+                    {(commentCounts[task.id] ?? 0) > 0 && (
+                      <span className="bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                        {commentCounts[task.id]}
+                      </span>
+                    )}
+                  </button>
+                </td>
                 <td className="px-4 md:px-6 py-4 text-right whitespace-nowrap">
                   <div className="flex items-center justify-end gap-1 relative">
                     {task.viewer_link && (
@@ -369,6 +411,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
           task={editTask}
           onClose={() => setEditTask(null)}
           onSuccess={() => { setEditTask(null); onRefresh(); }}
+        />
+      )}
+      {commentTaskId && (
+        <TaskCommentSection
+          taskId={commentTaskId}
+          taskName={tasks.find((t) => t.id === commentTaskId)?.drawing_name ?? ''}
+          onClose={() => setCommentTaskId(null)}
         />
       )}
     </div>
