@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
+import { Save, CheckCircle2, AlertCircle, Trash2, ClipboardPaste } from 'lucide-react';
 import { isFirebaseConfigured } from '../lib/firebase';
 
 interface FirebaseConfig {
@@ -33,11 +33,52 @@ const emptyConfig = (): FirebaseConfig => ({
   appId: '',
 });
 
+const parseFirebaseConfigText = (text: string): FirebaseConfig | null => {
+  // Try plain JSON first
+  try {
+    const parsed = JSON.parse(text.trim());
+    if (parsed && typeof parsed === 'object' && (parsed.apiKey || parsed.projectId)) {
+      return {
+        apiKey: parsed.apiKey ?? '',
+        authDomain: parsed.authDomain ?? '',
+        projectId: parsed.projectId ?? '',
+        storageBucket: parsed.storageBucket ?? '',
+        messagingSenderId: parsed.messagingSenderId ?? '',
+        appId: parsed.appId ?? '',
+      };
+    }
+  } catch {
+    // Not plain JSON – try extracting from JS/TS snippet
+  }
+
+  // Extract each key directly from the full text to avoid issues with nested
+  // braces or closing braces inside string values.
+  const extract = (key: string): string => {
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const m = text.match(new RegExp(`["']?${escapedKey}["']?\\s*:\\s*["'\`]([^"'\`]*)["'\`]`));
+    return m ? m[1] : '';
+  };
+
+  const result: FirebaseConfig = {
+    apiKey: extract('apiKey'),
+    authDomain: extract('authDomain'),
+    projectId: extract('projectId'),
+    storageBucket: extract('storageBucket'),
+    messagingSenderId: extract('messagingSenderId'),
+    appId: extract('appId'),
+  };
+
+  if (!result.apiKey && !result.projectId) return null;
+  return result;
+};
+
 export const SettingsPage: React.FC = () => {
   const [config, setConfig] = useState<FirebaseConfig>(emptyConfig);
   const [hasSavedConfig, setHasSavedConfig] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pasteText, setPasteText] = useState('');
+  const [pasteError, setPasteError] = useState<string | null>(null);
 
   const isEnvConfigured =
     !!import.meta.env.VITE_FIREBASE_API_KEY && !!import.meta.env.VITE_FIREBASE_PROJECT_ID;
@@ -54,6 +95,17 @@ export const SettingsPage: React.FC = () => {
       }
     }
   }, []);
+
+  const handleAutoParse = () => {
+    setPasteError(null);
+    const parsed = parseFirebaseConfigText(pasteText);
+    if (!parsed) {
+      setPasteError('Không thể đọc cấu hình. Hãy dán đúng đoạn JSON hoặc JavaScript từ Firebase Console.');
+      return;
+    }
+    setConfig(parsed);
+    setPasteText('');
+  };
 
   const handleSave = () => {
     if (!config.apiKey.trim() || !config.projectId.trim()) {
@@ -119,6 +171,34 @@ export const SettingsPage: React.FC = () => {
             Nhập thông tin Firebase của bạn. Bạn có thể tìm thấy các thông tin này trong{' '}
             <strong>Firebase Console → Project Settings → Your apps</strong>.
           </p>
+
+          {/* Auto-paste section */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+            <p className="text-xs font-bold text-slate-500 uppercase">Dán cấu hình tự động</p>
+            <p className="text-xs text-slate-500">
+              Sao chép toàn bộ đoạn <code className="bg-slate-200 px-1 rounded">firebaseConfig</code> từ{' '}
+              Firebase Console rồi dán vào đây — tất cả các trường sẽ được điền tự động.
+            </p>
+            <textarea
+              value={pasteText}
+              onChange={(e) => { setPasteText(e.target.value); setPasteError(null); }}
+              rows={5}
+              placeholder={`Dán cấu hình vào đây, ví dụ:\nconst firebaseConfig = {\n  apiKey: "AIzaSy...",\n  authDomain: "...",\n  ...\n};`}
+              className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-xs font-mono resize-none"
+            />
+            {pasteError && (
+              <p className="text-xs text-rose-600">{pasteError}</p>
+            )}
+            <button
+              type="button"
+              onClick={handleAutoParse}
+              disabled={!pasteText.trim()}
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-800 disabled:bg-slate-300 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95"
+            >
+              <ClipboardPaste size={16} />
+              Tự động điền các trường
+            </button>
+          </div>
 
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700">
