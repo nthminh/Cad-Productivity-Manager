@@ -28,6 +28,7 @@ import { TaskForm } from './components/TaskForm';
 import { EngineerList } from './components/EngineerList';
 import { SalaryPage } from './components/SalaryPage';
 import { ReportsPage } from './components/ReportsPage';
+import { SettingsPage } from './components/SettingsPage';
 import { db, isFirebaseConfigured } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { Task } from './types/database.types';
@@ -110,6 +111,7 @@ export default function App() {
                  activeTab === 'tasks' ? 'Quản lý dự án' :
                  activeTab === 'engineers' ? 'Danh sách kỹ sư' :
                  activeTab === 'salary' ? 'Tính lương' :
+                 activeTab === 'settings' ? 'Cài đặt' :
                  'Báo cáo'}
               </h2>
               <p className="text-slate-500 mt-1 text-xs lg:text-base hidden sm:block">
@@ -121,6 +123,8 @@ export default function App() {
                   ? 'Quản lý thông tin kỹ sư và nhân viên.'
                   : activeTab === 'salary'
                   ? 'Quản lý lương căn bản và lương theo dự án.'
+                  : activeTab === 'settings'
+                  ? 'Cấu hình kết nối Firebase Firestore.'
                   : 'Thống kê và phân tích hiệu suất toàn đội.'}
               </p>
             </div>
@@ -148,7 +152,17 @@ export default function App() {
           {error && (
             <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-700">
               <AlertCircle size={20} />
-              <p className="text-sm font-medium">{error}</p>
+              <p className="text-sm font-medium">
+                {error}
+                {!isFirebaseConfigured && (
+                  <button
+                    onClick={() => setActiveTab('settings')}
+                    className="ml-2 underline font-semibold hover:text-rose-900 transition-colors"
+                  >
+                    Vào Cài đặt →
+                  </button>
+                )}
+              </p>
             </div>
           )}
 
@@ -158,6 +172,8 @@ export default function App() {
             <SalaryPage />
           ) : activeTab === 'reports' ? (
             <ReportsPage />
+          ) : activeTab === 'settings' ? (
+            <SettingsPage />
           ) : activeTab === 'dashboard' ? (
             <div className="space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
