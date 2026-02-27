@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, Eye, EyeOff, AlertCircle, User } from 'lucide-react';
-import { verifyUser, setCurrentUser, ensureDefaultUsers, isUsingDefaultPassword } from '../lib/auth';
+import { verifyUser, setCurrentUser, ensureDefaultUsers, isUsingDefaultPassword, syncUsersFromFirestore } from '../lib/auth';
 
 interface LoginGateProps {
   onAuthenticated: () => void;
@@ -15,7 +15,9 @@ export const LoginGate: React.FC<LoginGateProps> = ({ onAuthenticated }) => {
   const [usingDefaultPwd, setUsingDefaultPwd] = useState(false);
 
   useEffect(() => {
-    ensureDefaultUsers().then(() => isUsingDefaultPassword().then(setUsingDefaultPwd));
+    syncUsersFromFirestore().then(() =>
+      ensureDefaultUsers().then(() => isUsingDefaultPassword().then(setUsingDefaultPwd))
+    );
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

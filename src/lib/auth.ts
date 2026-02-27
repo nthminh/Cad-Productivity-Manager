@@ -1,4 +1,6 @@
 import type { UserRole } from './permissions';
+import { db, isFirebaseConfigured } from './firebase';
+import { collection, getDocs, setDoc, doc, deleteDoc } from 'firebase/firestore';
 
 export type { UserRole };
 
@@ -21,6 +23,7 @@ const SESSION_USER_KEY = 'app_session_user';
 const LEGACY_SESSION_KEY = 'app_authenticated';
 const DEFAULT_PASSWORD = 'admin';
 const PBKDF2_ITERATIONS = 100000;
+const FIRESTORE_USERS_COLLECTION = 'app_users';
 
 // ── Crypto helpers ───────────────────────────────────────────────────
 
@@ -91,6 +94,39 @@ export function getUsers(): AppUser[] {
 
 function saveUsers(users: AppUser[]): void {
   localStorage.setItem(APP_USERS_KEY, JSON.stringify(users));
+  // Fire-and-forget sync to Firestore so other devices can pick up the changes
+  void syncUsersToFirestore(users);
+}
+
+async function syncUsersToFirestore(users: AppUser[]): Promise<void> {
+  if (!isFirebaseConfigured || !db) return;
+  try {
+    await Promise.all(
+      users.map((u) =>
+        setDoc(doc(db, FIRESTORE_USERS_COLLECTION, u.username), u),
+      ),
+    );
+  } catch (e) {
+    console.error('Failed to sync users to Firestore', e);
+  }
+}
+
+/**
+ * Fetches users from Firestore and updates localStorage.
+ * Should be called before ensureDefaultUsers() so that credentials created
+ * on another device (e.g. desktop) are available on this device (e.g. phone).
+ */
+export async function syncUsersFromFirestore(): Promise<void> {
+  if (!isFirebaseConfigured || !db) return;
+  try {
+    const snapshot = await getDocs(collection(db, FIRESTORE_USERS_COLLECTION));
+    if (!snapshot.empty) {
+      const users = snapshot.docs.map((d) => d.data() as AppUser);
+      localStorage.setItem(APP_USERS_KEY, JSON.stringify(users));
+    }
+  } catch (e) {
+    console.error('Failed to sync users from Firestore', e);
+  }
 }
 
 /**
@@ -234,5 +270,10 @@ export async function updateUser(
 
 export function removeUser(username: string): void {
   saveUsers(getUsers().filter((u) => u.username !== username));
+  if (isFirebaseConfigured && db) {
+    void deleteDoc(doc(db, FIRESTORE_USERS_COLLECTION, username)).catch((e) =>
+      console.error('Failed to delete user from Firestore', e),
+    );
+  }
 }
 
