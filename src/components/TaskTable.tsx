@@ -383,7 +383,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                       {task.actual_hours > 0 ? `${((task.target_hours / task.actual_hours) * 100).toFixed(1)}%` : '-%'}
                     </span>
                     <span className="text-[10px] text-slate-400">
-                      {task.target_hours}{task.target_hours_period && task.target_hours_period !== 'giờ' ? `h ${task.target_hours_period}` : 'h'} / {task.actual_hours.toFixed(1)}h
+                      {task.target_hours}h / {task.actual_hours.toFixed(1)}h
                     </span>
                   </div>
                 </td>
