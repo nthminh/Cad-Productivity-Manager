@@ -112,6 +112,31 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
   const [filterStatus, setFilterStatus] = useState('');
   const [colWidths, setColWidths] = useState<ColWidths>({ ...DEFAULT_COL_WIDTHS });
   const resizeRef = useRef<{ col: ColumnKey; startX: number; startW: number } | null>(null);
+  const [cellTooltip, setCellTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
+  const cellTooltipRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!cellTooltip) return;
+    const close = (e: MouseEvent) => {
+      if (cellTooltipRef.current && !cellTooltipRef.current.contains(e.target as Node)) {
+        setCellTooltip(null);
+      }
+    };
+    const timer = setTimeout(() => document.addEventListener('mousedown', close), 0);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', close);
+    };
+  }, [cellTooltip]);
+
+  const showCellTooltip = (e: React.MouseEvent, text: string | undefined | null) => {
+    if (!text) return;
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = Math.max(8, Math.min(rect.left, window.innerWidth - 320));
+    const y = rect.bottom + 6;
+    setCellTooltip({ text, x, y });
+  };
 
   const handleResizeMouseDown = (e: React.MouseEvent, col: ColumnKey) => {
     e.preventDefault();
@@ -300,10 +325,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
             )}
             {filteredTasks.map((task) => (
               <tr key={task.id} className="hover:bg-slate-50/50 transition-colors group">
-                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap cursor-pointer" onClick={(e) => showCellTooltip(e, task.drawing_name)}>
                   <span className="font-medium text-slate-900">{task.drawing_name}</span>
                 </td>
-                <td className="px-4 md:px-6 py-4 overflow-hidden">
+                <td className="px-4 md:px-6 py-4 overflow-hidden cursor-pointer" onClick={(e) => showCellTooltip(e, task.description)}>
                   <div className="flex flex-col gap-0.5">
                     {task.description ? (
                       <span className="text-sm text-slate-700 line-clamp-2 whitespace-normal">{task.description}</span>
@@ -313,7 +338,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     <span className="text-xs text-slate-400">{new Date(task.created_at).toLocaleDateString('vi-VN')}</span>
                   </div>
                 </td>
-                <td className="px-4 md:px-6 py-4 text-sm text-slate-600 overflow-hidden whitespace-nowrap">{task.engineer_name}</td>
+                <td className="px-4 md:px-6 py-4 text-sm text-slate-600 overflow-hidden whitespace-nowrap cursor-pointer" onClick={(e) => showCellTooltip(e, task.engineer_name)}>{task.engineer_name}</td>
                 <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
                   <div className="flex gap-0.5">
                     {[...Array(5)].map((_, i) => (
@@ -468,6 +493,17 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
         />
       )}
     </div>
+
+    {cellTooltip && (
+      <div
+        ref={cellTooltipRef}
+        className="fixed z-[200] bg-slate-900 text-white text-sm px-3 py-2 rounded-lg shadow-xl max-w-xs break-words leading-relaxed pointer-events-auto"
+        style={{ top: cellTooltip.y, left: cellTooltip.x }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        {cellTooltip.text}
+      </div>
+    )}
     </div>
   );
 };
