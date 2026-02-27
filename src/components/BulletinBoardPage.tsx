@@ -96,9 +96,10 @@ interface RichTextEditorProps {
   onChange: (html: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  onImagePaste?: (file: File) => Promise<string>;
 }
 
-const RichTextEditor: React.FC<RichTextEditorProps> = ({ onChange, placeholder, disabled }) => {
+const RichTextEditor: React.FC<RichTextEditorProps> = ({ onChange, placeholder, disabled, onImagePaste }) => {
   const editorRef = useRef<HTMLDivElement>(null);
 
   const format = (command: string, value?: string) => {
@@ -116,6 +117,43 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ onChange, placeholder, 
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
     document.execCommand('insertHTML', false, `<span style="letter-spacing:0.08em">${selectedText}</span>`);
+    onChange(editorRef.current?.innerHTML ?? '');
+  };
+
+  const handlePaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
+    if (!onImagePaste) return;
+    const items = Array.from(e.clipboardData.items) as DataTransferItem[];
+    const imageItem = items.find((item) => item.type.startsWith('image/'));
+    if (!imageItem) return;
+    e.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    const placeholderId = `img-upload-${crypto.randomUUID()}`;
+    document.execCommand(
+      'insertHTML',
+      false,
+      `<span id="${placeholderId}" style="color:#94a3b8;font-size:0.8em">[Đang tải ảnh...]</span>`,
+    );
+    onChange(editorRef.current?.innerHTML ?? '');
+    try {
+      const url = await onImagePaste(file);
+      const placeholder = editorRef.current?.querySelector(`#${placeholderId}`);
+      if (placeholder) {
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = 'Ảnh dán';
+        img.style.cssText = 'max-width:100%;border-radius:8px;margin:4px 0';
+        placeholder.replaceWith(img);
+      } else {
+        document.execCommand('insertImage', false, url);
+      }
+    } catch {
+      const placeholder = editorRef.current?.querySelector(`#${placeholderId}`);
+      if (placeholder) {
+        (placeholder as HTMLElement).textContent = '[Tải ảnh thất bại]';
+        (placeholder as HTMLElement).style.color = '#ef4444';
+      }
+    }
     onChange(editorRef.current?.innerHTML ?? '');
   };
 
@@ -195,6 +233,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ onChange, placeholder, 
           const html = (e.target as HTMLDivElement).innerHTML;
           onChange(html === '<br>' ? '' : html);
         }}
+        onPaste={handlePaste}
         data-placeholder={placeholder}
         className="min-h-[100px] px-4 py-3 text-sm text-slate-800 focus:outline-none"
         suppressContentEditableWarning
@@ -510,10 +549,25 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
   const [videoUrl, setVideoUrl] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const currentUser = getCurrentUser();
+
+  const handleImagePaste = async (file: File): Promise<string> => {
+    if (!storage) throw new Error('Storage not available');
+    setUploadingImage(true);
+    try {
+      const mimeType = file.type;
+      const ext = mimeType && mimeType.includes('/') ? mimeType.split('/')[1].split('+')[0] : 'png';
+      const fileRef = storageRef(storage, `bulletin_images/${crypto.randomUUID()}.${ext}`);
+      await uploadBytes(fileRef, file);
+      return await getDownloadURL(fileRef);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   useEffect(() => {
     if (!db) return;
@@ -617,8 +671,9 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
 
             <RichTextEditor
               onChange={setContent}
-              placeholder="Nội dung bài đăng (cập nhật tin tức, thông báo...)..."
+              placeholder="Nội dung bài đăng (cập nhật tin tức, thông báo...). Dán ảnh trực tiếp vào đây..."
               disabled={submitting}
+              onImagePaste={storage ? handleImagePaste : undefined}
             />
 
             <div className="flex items-center gap-2">
@@ -694,11 +749,11 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
               </button>
               <button
                 type="submit"
-                disabled={submitting || !content.trim()}
+                disabled={submitting || uploadingImage || !content.trim()}
                 className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 text-white px-5 py-2 rounded-xl text-sm font-medium transition-all active:scale-95"
               >
                 <Send size={16} />
-                {uploadingPdf ? 'Đang tải PDF...' : submitting ? 'Đang đăng...' : 'Đăng bài'}
+                {uploadingImage ? 'Đang tải ảnh...' : uploadingPdf ? 'Đang tải PDF...' : submitting ? 'Đang đăng...' : 'Đăng bài'}
               </button>
             </div>
           </form>
