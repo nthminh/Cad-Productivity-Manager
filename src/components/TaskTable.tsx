@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ExternalLink, Eye, MoreVertical, Star, Download, Search, Filter, FileDown, X, MessageSquare } from 'lucide-react';
 import { Task } from '../types/database.types';
 import { TaskContextMenu } from './TaskContextMenu';
@@ -6,6 +6,26 @@ import { EditTaskForm } from './EditTaskForm';
 import { TaskCommentSection } from './TaskCommentSection';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+
+const COLUMNS = [
+  { key: 'drawing_name' as const, label: 'Tên dự án', defaultWidth: 160 },
+  { key: 'description' as const, label: 'Thông tin dự án', defaultWidth: 200 },
+  { key: 'engineer_name' as const, label: 'Kỹ sư', defaultWidth: 130 },
+  { key: 'difficulty' as const, label: 'Độ khó', defaultWidth: 100 },
+  { key: 'status' as const, label: 'Trạng thái', defaultWidth: 115 },
+  { key: 'deadline' as const, label: 'Hạn chót', defaultWidth: 115 },
+  { key: 'productivity' as const, label: 'Năng suất (T/A)', defaultWidth: 135 },
+  { key: 'cost' as const, label: 'Giá thành', defaultWidth: 130 },
+  { key: 'actual_hours' as const, label: 'Giờ thực tế', defaultWidth: 115 },
+  { key: 'drive_link' as const, label: 'Tải về', defaultWidth: 90 },
+  { key: 'comments' as const, label: 'Bình luận', defaultWidth: 95 },
+  { key: 'actions' as const, label: 'Thao tác', defaultWidth: 105 },
+];
+type ColumnKey = typeof COLUMNS[number]['key'];
+type ColWidths = Record<ColumnKey, number>;
+const DEFAULT_COL_WIDTHS: ColWidths = Object.fromEntries(
+  COLUMNS.map(c => [c.key, c.defaultWidth])
+) as ColWidths;
 
 function ActualHoursInput({ task, onRefresh, readOnly }: { task: Task; onRefresh: () => void; readOnly?: boolean }) {
   const [value, setValue] = useState(String(task.actual_hours ?? 0));
@@ -90,6 +110,26 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
   const [search, setSearch] = useState('');
   const [filterEngineer, setFilterEngineer] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [colWidths, setColWidths] = useState<ColWidths>({ ...DEFAULT_COL_WIDTHS });
+  const resizeRef = useRef<{ col: ColumnKey; startX: number; startW: number } | null>(null);
+
+  const handleResizeMouseDown = (e: React.MouseEvent, col: ColumnKey) => {
+    e.preventDefault();
+    resizeRef.current = { col, startX: e.clientX, startW: colWidths[col] };
+    const onMouseMove = (ev: MouseEvent) => {
+      const current = resizeRef.current;
+      if (!current) return;
+      const newWidth = Math.max(60, current.startW + ev.clientX - current.startX);
+      setColWidths(prev => ({ ...prev, [current.col]: newWidth }));
+    };
+    const onMouseUp = () => {
+      resizeRef.current = null;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  };
 
   useEffect(() => {
     if (!db || tasks.length === 0) return;
@@ -226,21 +266,28 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
 
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
-        <table className="min-w-full w-full text-left border-collapse">
+        <table className="w-full text-left border-collapse" style={{ tableLayout: 'fixed', minWidth: COLUMNS.reduce((s, c) => s + colWidths[c.key], 0) }}>
+          <colgroup>
+            {COLUMNS.map(col => (
+              <col key={col.key} style={{ width: colWidths[col.key] }} />
+            ))}
+          </colgroup>
           <thead>
             <tr className="bg-slate-50 border-bottom border-slate-200">
-              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tên dự án</th>
-              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Thông tin dự án</th>
-              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Kỹ sư</th>
-              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Độ khó</th>
-              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Trạng thái</th>
-              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Hạn chót</th>
-              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Năng suất (T/A)</th>
-              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Giá thành</th>
-              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Giờ thực tế</th>
-              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tải về</th>
-              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Bình luận</th>
-              <th className="px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right whitespace-nowrap">Thao tác</th>
+              {COLUMNS.map((col, idx) => (
+                <th
+                  key={col.key}
+                  className={`px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap relative select-none ${col.key === 'actions' ? 'text-right' : ''}`}
+                >
+                  {col.label}
+                  {idx < COLUMNS.length - 1 && (
+                    <div
+                      className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-emerald-400/60 active:bg-emerald-500/80"
+                      onMouseDown={(e) => handleResizeMouseDown(e, col.key)}
+                    />
+                  )}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -253,10 +300,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
             )}
             {filteredTasks.map((task) => (
               <tr key={task.id} className="hover:bg-slate-50/50 transition-colors group">
-                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
                   <span className="font-medium text-slate-900">{task.drawing_name}</span>
                 </td>
-                <td className="px-4 md:px-6 py-4 max-w-[200px]">
+                <td className="px-4 md:px-6 py-4 overflow-hidden">
                   <div className="flex flex-col gap-0.5">
                     {task.description ? (
                       <span className="text-sm text-slate-700 line-clamp-2 whitespace-normal">{task.description}</span>
@@ -266,8 +313,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     <span className="text-xs text-slate-400">{new Date(task.created_at).toLocaleDateString('vi-VN')}</span>
                   </div>
                 </td>
-                <td className="px-4 md:px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{task.engineer_name}</td>
-                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                <td className="px-4 md:px-6 py-4 text-sm text-slate-600 overflow-hidden whitespace-nowrap">{task.engineer_name}</td>
+                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
                   <div className="flex gap-0.5">
                     {[...Array(5)].map((_, i) => (
                       <Star 
@@ -278,12 +325,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     ))}
                   </div>
                 </td>
-                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
                   <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status)}`}>
                     {task.status}
                   </span>
                 </td>
-                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
                   {task.deadline ? (
                     <div className="flex flex-col">
                       <span className={`text-sm font-medium ${
@@ -301,7 +348,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     <span className="text-slate-400 text-xs italic">Chưa đặt</span>
                   )}
                 </td>
-                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
                   <div className="flex flex-col">
                     <span className={`text-sm ${getProductivityColor(task.target_hours, task.actual_hours)}`}>
                       {task.actual_hours > 0 ? `${((task.target_hours / task.actual_hours) * 100).toFixed(1)}%` : '-%'}
@@ -311,7 +358,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     </span>
                   </div>
                 </td>
-                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
                   {task.cost != null && task.cost > 0 ? (
                     <span className="text-sm font-medium text-slate-700">
                       {task.cost.toLocaleString('vi-VN')} ₫
@@ -320,10 +367,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     <span className="text-slate-400 text-xs italic">Chưa có</span>
                   )}
                 </td>
-                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
                   <ActualHoursInput task={task} onRefresh={onRefresh} readOnly={!canEdit} />
                 </td>
-                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
                   {task.drive_link ? (
                     <a
                       href={task.drive_link}
@@ -339,7 +386,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     <span className="text-slate-400 text-xs italic">Chưa có</span>
                   )}
                 </td>
-                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
                   <button
                     onClick={() => setCommentTaskId(task.id)}
                     className="relative flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 border border-slate-200 hover:border-emerald-300 rounded-lg text-xs font-medium transition-colors"
@@ -353,7 +400,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     )}
                   </button>
                 </td>
-                <td className="px-4 md:px-6 py-4 text-right whitespace-nowrap">
+                <td className="px-4 md:px-6 py-4 text-right overflow-hidden whitespace-nowrap">
                   <div className="flex items-center justify-end gap-1 relative">
                     {task.viewer_link && (
                       <button 
