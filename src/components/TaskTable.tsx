@@ -6,7 +6,7 @@ import { EditTaskForm } from './EditTaskForm';
 import { db } from '../lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 
-function ActualHoursInput({ task, onRefresh }: { task: Task; onRefresh: () => void }) {
+function ActualHoursInput({ task, onRefresh, readOnly }: { task: Task; onRefresh: () => void; readOnly?: boolean }) {
   const [value, setValue] = useState(String(task.actual_hours ?? 0));
 
   useEffect(() => {
@@ -24,6 +24,10 @@ function ActualHoursInput({ task, onRefresh }: { task: Task; onRefresh: () => vo
       console.error('Error updating actual hours:', e);
     }
   };
+
+  if (readOnly) {
+    return <span className="text-sm text-slate-700">{(task.actual_hours ?? 0).toFixed(1)}h</span>;
+  }
 
   return (
     <input
@@ -43,6 +47,8 @@ interface TaskTableProps {
   tasks: Task[];
   onRefresh: () => void;
   onViewDrawing: (link: string) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 function exportToCSV(tasks: Task[]) {
@@ -74,7 +80,7 @@ function exportToCSV(tasks: Task[]) {
   URL.revokeObjectURL(url);
 }
 
-export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDrawing }) => {
+export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDrawing, canEdit = true, canDelete = true }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [search, setSearch] = useState('');
@@ -282,7 +288,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                   )}
                 </td>
                 <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                  <ActualHoursInput task={task} onRefresh={onRefresh} />
+                  <ActualHoursInput task={task} onRefresh={onRefresh} readOnly={!canEdit} />
                 </td>
                 <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   {task.drive_link ? (
@@ -322,18 +328,22 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                         <ExternalLink size={18} />
                       </a>
                     )}
-                    <button 
-                      onClick={() => setOpenMenuId(openMenuId === task.id ? null : task.id)}
-                      className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                      <MoreVertical size={18} />
-                    </button>
+                    {(canEdit || canDelete) && (
+                      <button 
+                        onClick={() => setOpenMenuId(openMenuId === task.id ? null : task.id)}
+                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                      >
+                        <MoreVertical size={18} />
+                      </button>
+                    )}
                     {openMenuId === task.id && (
                       <TaskContextMenu
                         task={task}
                         onClose={() => setOpenMenuId(null)}
                         onRefresh={onRefresh}
                         onEdit={(t) => { setEditTask(t); setOpenMenuId(null); }}
+                        canEdit={canEdit}
+                        canDelete={canDelete}
                       />
                     )}
                   </div>

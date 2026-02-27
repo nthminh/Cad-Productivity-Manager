@@ -2,6 +2,7 @@ import React from 'react';
 import { LayoutDashboard, ClipboardList, HardHat, X, Users, DollarSign, BarChart3, Settings } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { type UserRole, getPermissions } from '../lib/permissions';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -12,17 +13,22 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   isMobileMenuOpen: boolean;
   setIsMobileMenuOpen: (isOpen: boolean) => void;
+  userRole: UserRole;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen }) => {
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'tasks', label: 'Quản lý Task', icon: ClipboardList },
-    { id: 'engineers', label: 'Danh sách kỹ sư', icon: Users },
-    { id: 'salary', label: 'Tính lương', icon: DollarSign },
-    { id: 'reports', label: 'Báo cáo', icon: BarChart3 },
-    { id: 'settings', label: 'Cài đặt', icon: Settings },
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, userRole }) => {
+  const perms = getPermissions(userRole);
+
+  const allMenuItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: true },
+    { id: 'tasks', label: 'Quản lý Task', icon: ClipboardList, visible: true },
+    { id: 'engineers', label: 'Danh sách kỹ sư', icon: Users, visible: perms.canViewEngineers },
+    { id: 'salary', label: 'Tính lương', icon: DollarSign, visible: perms.canViewSalary },
+    { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: perms.canViewReports },
+    { id: 'settings', label: 'Cài đặt', icon: Settings, visible: perms.canViewSettings },
   ];
+
+  const menuItems = allMenuItems.filter((item) => item.visible);
 
   return (
     <>
