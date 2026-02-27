@@ -93,7 +93,7 @@ export const ChatPage: React.FC = () => {
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const currentUser = getCurrentUser();
 
   useEffect(() => {
@@ -115,9 +115,12 @@ export const ChatPage: React.FC = () => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInput(val);
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
     const match = val.match(/@(\w*)$/);
     if (match) {
       setMentionQuery(match[1].toLowerCase());
@@ -146,8 +149,7 @@ export const ChatPage: React.FC = () => {
     return matches ? matches.map((m) => m.slice(1)) : [];
   };
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const sendMessage = async () => {
     const text = input.trim();
     if (!text || !db || !currentUser) return;
     setSending(true);
@@ -169,6 +171,7 @@ export const ChatPage: React.FC = () => {
       }
       await addDoc(collection(db, 'chat_messages'), msgData);
       setInput('');
+      if (inputRef.current) inputRef.current.style.height = 'auto';
       setReplyTo(null);
       setMentionQuery(null);
     } catch (err) {
@@ -177,6 +180,11 @@ export const ChatPage: React.FC = () => {
     } finally {
       setSending(false);
     }
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await sendMessage();
   };
 
   const uploadFile = useCallback(async (file: File, type: 'image' | 'file') => {
@@ -521,60 +529,70 @@ export const ChatPage: React.FC = () => {
             </div>
           )}
 
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-col sm:flex-row gap-2 items-end">
             {/* Hidden file inputs */}
             <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'image')} />
             <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => handleFileChange(e, 'file')} />
 
-            <button
-              type="button"
-              title="Gửi ảnh"
-              disabled={noStorage || !currentUser || sending}
-              onClick={() => imageInputRef.current?.click()}
-              className="p-2.5 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-colors disabled:opacity-40 flex-shrink-0"
-            >
-              <ImageIcon size={18} />
-            </button>
+            {/* Action buttons */}
+            <div className="flex items-center gap-1 self-end sm:self-auto flex-shrink-0">
+              <button
+                type="button"
+                title="Gửi ảnh"
+                disabled={noStorage || !currentUser || sending}
+                onClick={() => imageInputRef.current?.click()}
+                className="p-2.5 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-colors disabled:opacity-40 flex-shrink-0"
+              >
+                <ImageIcon size={18} />
+              </button>
 
-            <button
-              type="button"
-              title="Gửi file"
-              disabled={noStorage || !currentUser || sending}
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2.5 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-colors disabled:opacity-40 flex-shrink-0"
-            >
-              <Paperclip size={18} />
-            </button>
+              <button
+                type="button"
+                title="Gửi file"
+                disabled={noStorage || !currentUser || sending}
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2.5 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-colors disabled:opacity-40 flex-shrink-0"
+              >
+                <Paperclip size={18} />
+              </button>
 
-            <button
-              type="button"
-              title={isRecording ? 'Dừng ghi âm' : 'Ghi voice'}
-              disabled={noStorage || !currentUser || (sending && !isRecording)}
-              onClick={isRecording ? stopRecording : startRecording}
-              className={`p-2.5 rounded-xl transition-colors flex-shrink-0 disabled:opacity-40 ${isRecording ? 'text-rose-500 bg-rose-50 hover:bg-rose-100' : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50'}`}
-            >
-              {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
-            </button>
+              <button
+                type="button"
+                title={isRecording ? 'Dừng ghi âm' : 'Ghi voice'}
+                disabled={noStorage || !currentUser || (sending && !isRecording)}
+                onClick={isRecording ? stopRecording : startRecording}
+                className={`p-2.5 rounded-xl transition-colors flex-shrink-0 disabled:opacity-40 ${isRecording ? 'text-rose-500 bg-rose-50 hover:bg-rose-100' : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50'}`}
+              >
+                {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+              </button>
+            </div>
 
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') { setMentionQuery(null); setReplyTo(null); }
-              }}
-              placeholder="Nhập tin nhắn... (dùng @ để nhắc ai đó)"
-              disabled={!db || !currentUser || sending}
-              className="flex-1 min-w-0 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm"
-            />
-            <button
-              type="submit"
-              disabled={sending || !input.trim() || !db || !currentUser}
-              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 text-white px-4 py-2.5 rounded-xl font-medium transition-all active:scale-95 flex-shrink-0"
-            >
-              <Send size={18} />
-            </button>
+            {/* Text input + send button */}
+            <div className="flex gap-2 items-end w-full sm:flex-1">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                  if (e.key === 'Escape') { setMentionQuery(null); setReplyTo(null); }
+                }}
+                placeholder="Nhập tin nhắn... (dùng @ để nhắc ai đó)"
+                disabled={!db || !currentUser || sending}
+                rows={1}
+                className="flex-1 min-w-0 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm resize-none overflow-hidden"
+              />
+              <button
+                type="submit"
+                disabled={sending || !input.trim() || !db || !currentUser}
+                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 text-white px-4 py-2.5 rounded-xl font-medium transition-all active:scale-95 flex-shrink-0"
+              >
+                <Send size={18} />
+              </button>
+            </div>
           </div>
           {noStorage && (
             <p className="text-[10px] text-amber-600 text-center">
