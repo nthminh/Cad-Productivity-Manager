@@ -162,7 +162,7 @@ export async function verifyUser(username: string, password: string): Promise<Ap
 }
 
 export function getCurrentUser(): SessionUser | null {
-  const stored = sessionStorage.getItem(SESSION_USER_KEY);
+  const stored = localStorage.getItem(SESSION_USER_KEY);
   if (!stored) return null;
   try {
     return JSON.parse(stored) as SessionUser;
@@ -181,7 +181,7 @@ export function setCurrentUser(user: AppUser): void {
     displayName: user.displayName,
     role: user.role,
   };
-  sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(sessionUser));
+  localStorage.setItem(SESSION_USER_KEY, JSON.stringify(sessionUser));
 }
 
 /** @deprecated Use setCurrentUser instead. Kept for backward compatibility. */
@@ -190,6 +190,8 @@ export function setAuthenticated(): void {
 }
 
 export function logout(): void {
+  localStorage.removeItem(SESSION_USER_KEY);
+  // Also clear legacy sessionStorage entries for backward compatibility
   sessionStorage.removeItem(SESSION_USER_KEY);
   sessionStorage.removeItem(LEGACY_SESSION_KEY);
 }

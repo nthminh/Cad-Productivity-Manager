@@ -111,6 +111,7 @@ export default function App() {
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         userRole={role}
+        onLogout={() => { setAuthenticated(false); setAppUser(null); }}
       />
 
       <div className="lg:pl-64 flex-1 flex flex-col">

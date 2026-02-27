@@ -82,6 +82,7 @@ function exportToCSV(tasks: Task[]) {
 
 export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDrawing, canEdit = true, canDelete = true }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [search, setSearch] = useState('');
   const [filterEngineer, setFilterEngineer] = useState('');
@@ -227,9 +228,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                 <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   <span className="font-medium text-slate-900">{task.drawing_name}</span>
                 </td>
-                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                  <div className="flex flex-col">
-                    <span className="text-xs text-slate-500">ID: {task.project_id.slice(0, 8)}...</span>
+                <td className="px-4 md:px-6 py-4 max-w-[200px]">
+                  <div className="flex flex-col gap-0.5">
+                    {task.description ? (
+                      <span className="text-sm text-slate-700 line-clamp-2 whitespace-normal">{task.description}</span>
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">Chưa có</span>
+                    )}
                     <span className="text-xs text-slate-400">{new Date(task.created_at).toLocaleDateString('vi-VN')}</span>
                   </div>
                 </td>
@@ -330,7 +335,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     )}
                     {(canEdit || canDelete) && (
                       <button 
-                        onClick={() => setOpenMenuId(openMenuId === task.id ? null : task.id)}
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                          setOpenMenuId(openMenuId === task.id ? null : task.id);
+                        }}
                         className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                       >
                         <MoreVertical size={18} />
@@ -344,6 +353,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                         onEdit={(t) => { setEditTask(t); setOpenMenuId(null); }}
                         canEdit={canEdit}
                         canDelete={canDelete}
+                        position={menuPos}
                       />
                     )}
                   </div>
