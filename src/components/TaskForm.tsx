@@ -189,6 +189,34 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
                 placeholder="0"
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
               />
+              <div className="flex flex-wrap gap-1 pt-1">
+                {[
+                  { label: '100K', value: 100_000 },
+                  { label: '500K', value: 500_000 },
+                  { label: '1Tr', value: 1_000_000 },
+                  { label: '5Tr', value: 5_000_000 },
+                  { label: '10Tr', value: 10_000_000 },
+                  { label: '50Tr', value: 50_000_000 },
+                  { label: '100Tr', value: 100_000_000 },
+                  { label: '1Tỷ', value: 1_000_000_000 },
+                ].map(({ label, value }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, cost: prev.cost + value }))}
+                    className="px-2 py-0.5 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors font-medium"
+                  >
+                    +{label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, cost: 0 }))}
+                  className="px-2 py-0.5 text-xs bg-slate-100 text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-200 transition-colors font-medium"
+                >
+                  Xóa
+                </button>
+              </div>
             </div>
           </div>
 

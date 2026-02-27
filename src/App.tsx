@@ -29,6 +29,7 @@ import { EngineerList } from './components/EngineerList';
 import { SalaryPage } from './components/SalaryPage';
 import { ReportsPage } from './components/ReportsPage';
 import { SettingsPage } from './components/SettingsPage';
+import { ChatPage } from './components/ChatPage';
 import { LoginGate } from './components/LoginGate';
 import { db, isFirebaseConfigured } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
@@ -129,6 +130,7 @@ export default function App() {
                  activeTab === 'tasks' ? 'Quản lý dự án' :
                  activeTab === 'engineers' ? 'Danh sách kỹ sư' :
                  activeTab === 'salary' ? 'Tính lương' :
+                 activeTab === 'chat' ? 'Chat nội bộ' :
                  activeTab === 'settings' ? 'Cài đặt' :
                  'Báo cáo'}
               </h2>
@@ -141,6 +143,8 @@ export default function App() {
                   ? 'Quản lý thông tin kỹ sư và nhân viên.'
                   : activeTab === 'salary'
                   ? 'Quản lý lương căn bản và lương theo dự án.'
+                  : activeTab === 'chat'
+                  ? 'Nhắn tin và trao đổi với các thành viên trong nhóm.'
                   : activeTab === 'settings'
                   ? 'Cấu hình kết nối Firebase Firestore.'
                   : 'Thống kê và phân tích hiệu suất toàn đội.'}
@@ -200,6 +204,8 @@ export default function App() {
             <SalaryPage canEditSalary={perms.canEditSalary} />
           ) : activeTab === 'reports' && perms.canViewReports ? (
             <ReportsPage />
+          ) : activeTab === 'chat' ? (
+            <ChatPage />
           ) : activeTab === 'settings' && perms.canViewSettings ? (
             <SettingsPage />
           ) : activeTab === 'dashboard' ? (
