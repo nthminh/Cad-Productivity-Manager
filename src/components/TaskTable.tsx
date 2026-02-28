@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ExternalLink, Eye, MoreVertical, Star, Download, Search, Filter, FileDown, FileSpreadsheet, X, MessageSquare } from 'lucide-react';
+import { ExternalLink, Eye, MoreVertical, Star, Download, Search, Filter, FileDown, FileSpreadsheet, X, MessageSquare, ChevronRight, ChevronDown } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { Task } from '../types/database.types';
 import { TaskContextMenu } from './TaskContextMenu';
@@ -199,6 +199,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
   const resizeRef = useRef<{ col: ColumnKey; startX: number; startW: number } | null>(null);
   const [cellTooltip, setCellTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const cellTooltipRef = useRef<HTMLDivElement>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!cellTooltip) return;
@@ -270,7 +271,22 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
     [tasks]
   );
 
-  const filteredTasks = tasks.filter(t => {
+  // Group child tasks by parentId for quick lookup
+  const childTasksMap = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    tasks.forEach(t => {
+      if (t.parentId) {
+        const existing = map.get(t.parentId) ?? [];
+        map.set(t.parentId, [...existing, t]);
+      }
+    });
+    return map;
+  }, [tasks]);
+
+  // Only show root tasks (parentId is null/undefined) in the main list
+  const rootTasks = useMemo(() => tasks.filter(t => !t.parentId), [tasks]);
+
+  const filteredTasks = rootTasks.filter(t => {
     const matchSearch = search === '' || t.drawing_name.toLowerCase().includes(search.toLowerCase());
     const matchEngineer = filterEngineer === '' || t.engineer_name === filterEngineer;
     const matchStatus = filterStatus === '' || t.status === filterStatus;
@@ -377,7 +393,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
         </div>
         {hasActiveFilters && (
           <p className="mt-2 text-xs text-slate-500">
-            Hiển thị {filteredTasks.length} / {tasks.length} dự án
+            Hiển thị {filteredTasks.length} / {rootTasks.length} dự án
           </p>
         )}
       </div>
@@ -416,157 +432,396 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                 </td>
               </tr>
             )}
-            {filteredTasks.map((task) => (
-              <tr key={task.id} className="hover:bg-slate-50/50 transition-colors group">
-                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap cursor-pointer" onClick={(e) => showCellTooltip(e, task.drawing_name)}>
-                  <span className="font-medium text-slate-900">{task.drawing_name}</span>
-                </td>
-                <td className="px-4 md:px-6 py-4 overflow-hidden cursor-pointer" onClick={(e) => showCellTooltip(e, task.description)}>
-                  <div className="flex flex-col gap-0.5">
-                    {task.description ? (
-                      <span className="text-sm text-slate-700 line-clamp-2 whitespace-normal">{task.description}</span>
-                    ) : (
-                      <span className="text-xs text-slate-400 italic">Chưa có</span>
-                    )}
-                    <span className="text-xs text-slate-400">{new Date(task.created_at).toLocaleDateString('vi-VN')}</span>
-                  </div>
-                </td>
-                <td className="px-4 md:px-6 py-4 text-sm text-slate-600 overflow-hidden whitespace-nowrap cursor-pointer" onClick={(e) => showCellTooltip(e, task.engineer_name)}>{task.engineer_name}</td>
-                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
-                  <div className="flex gap-0.5">
-                    {[...Array(5)].map((_, i) => (
-                      <Star 
-                        key={i} 
-                        size={14} 
-                        className={i < task.difficulty ? "text-amber-400 fill-amber-400" : "text-slate-200"} 
-                      />
-                    ))}
-                  </div>
-                </td>
-                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status)}`}>
-                    {task.status}
-                  </span>
-                </td>
-                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
-                  {task.deadline ? (
-                    <div className="flex flex-col">
-                      <span className={`text-sm font-medium ${
-                        new Date(task.deadline) < new Date() && !isInactiveStatus(task.status)
-                          ? 'text-rose-600' 
-                          : 'text-slate-700'
-                      }`}>
-                        {new Date(task.deadline).toLocaleDateString('vi-VN')}
+            {filteredTasks.map((task) => {
+              const children = childTasksMap.get(task.id) ?? [];
+              const hasChildren = children.length > 0;
+              const isExpanded = expandedIds.has(task.id);
+              const rollupHours = hasChildren ? children.reduce((s, c) => s + (c.actual_hours ?? 0), 0) : null;
+              const rollupTargetHours = hasChildren ? children.reduce((s, c) => s + (c.target_hours ?? 0), 0) : null;
+              const rollupCost = hasChildren ? children.reduce((s, c) => s + (c.cost ?? 0), 0) : null;
+              const displayHours = rollupHours !== null ? rollupHours : task.actual_hours;
+              const displayTargetHours = rollupTargetHours !== null ? rollupTargetHours : task.target_hours;
+              const displayCost = rollupCost !== null ? rollupCost : task.cost;
+
+              const renderTaskRow = (t: Task, isChild: boolean) => {
+                const childList = childTasksMap.get(t.id) ?? [];
+                const childHasChildren = childList.length > 0;
+                const childIsExpanded = expandedIds.has(t.id);
+                const childRollupHours = childHasChildren ? childList.reduce((s, c) => s + (c.actual_hours ?? 0), 0) : null;
+                const childRollupTargetHours = childHasChildren ? childList.reduce((s, c) => s + (c.target_hours ?? 0), 0) : null;
+                const childRollupCost = childHasChildren ? childList.reduce((s, c) => s + (c.cost ?? 0), 0) : null;
+                const rowHours = childRollupHours !== null ? childRollupHours : t.actual_hours;
+                const rowTargetHours = childRollupTargetHours !== null ? childRollupTargetHours : t.target_hours;
+                const rowCost = childRollupCost !== null ? childRollupCost : t.cost;
+
+                return (
+                  <tr key={t.id} className={`hover:bg-slate-50/50 transition-colors group ${isChild ? 'bg-slate-50/30' : ''}`}>
+                    <td className={`py-4 overflow-hidden whitespace-nowrap ${isChild ? 'pl-10 pr-4 md:pl-14 md:pr-6' : 'px-4 md:px-6'}`}>
+                      <div className="flex items-center gap-1.5">
+                        {childHasChildren ? (
+                          <button
+                            onClick={() => setExpandedIds(prev => {
+                              const next = new Set(prev);
+                              if (next.has(t.id)) next.delete(t.id); else next.add(t.id);
+                              return next;
+                            })}
+                            className="flex-shrink-0 p-0.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                            title={childIsExpanded ? 'Thu gọn' : 'Mở rộng'}
+                          >
+                            {childIsExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                          </button>
+                        ) : (
+                          <span className="flex-shrink-0 w-5" />
+                        )}
+                        <span
+                          className={`font-medium cursor-pointer ${isChild ? 'text-slate-700' : 'text-slate-900'}`}
+                          onClick={(e) => showCellTooltip(e, t.drawing_name)}
+                        >
+                          {t.drawing_name}
+                          {childHasChildren && (
+                            <span className="ml-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                              {childList.length} con
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    </td>
+                    <td className={`py-4 overflow-hidden cursor-pointer ${isChild ? 'pl-2 pr-4 md:pr-6' : 'px-4 md:px-6'}`} onClick={(e) => showCellTooltip(e, t.description)}>
+                      <div className="flex flex-col gap-0.5">
+                        {t.description ? (
+                          <span className="text-sm text-slate-700 line-clamp-2 whitespace-normal">{t.description}</span>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">Chưa có</span>
+                        )}
+                        <span className="text-xs text-slate-400">{new Date(t.created_at).toLocaleDateString('vi-VN')}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 text-sm text-slate-600 overflow-hidden whitespace-nowrap cursor-pointer" onClick={(e) => showCellTooltip(e, t.engineer_name)}>{t.engineer_name}</td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      <div className="flex gap-0.5">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            size={14}
+                            className={i < t.difficulty ? "text-amber-400 fill-amber-400" : "text-slate-200"}
+                          />
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(t.status)}`}>
+                        {t.status}
                       </span>
-                      {new Date(task.deadline) < new Date() && !isInactiveStatus(task.status) && (
-                        <span className="text-[10px] text-rose-500 font-bold uppercase">Quá hạn</span>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      {t.deadline ? (
+                        <div className="flex flex-col">
+                          <span className={`text-sm font-medium ${
+                            new Date(t.deadline) < new Date() && !isInactiveStatus(t.status)
+                              ? 'text-rose-600'
+                              : 'text-slate-700'
+                          }`}>
+                            {new Date(t.deadline).toLocaleDateString('vi-VN')}
+                          </span>
+                          {new Date(t.deadline) < new Date() && !isInactiveStatus(t.status) && (
+                            <span className="text-[10px] text-rose-500 font-bold uppercase">Quá hạn</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">Chưa đặt</span>
                       )}
-                    </div>
-                  ) : (
-                    <span className="text-slate-400 text-xs italic">Chưa đặt</span>
-                  )}
-                </td>
-                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
-                  <div className="flex flex-col">
-                    <span className={`text-sm ${getProductivityColor(task.target_hours, task.actual_hours)}`}>
-                      {task.actual_hours > 0 ? `${((task.target_hours / task.actual_hours) * 100).toFixed(1)}%` : '-%'}
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      {task.target_hours}h / {task.actual_hours.toFixed(1)}h
-                    </span>
-                  </div>
-                </td>
-                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
-                  {task.cost != null && task.cost > 0 ? (
-                    <span className="text-sm font-medium text-slate-700">
-                      {task.cost.toLocaleString('vi-VN')} ₫
-                    </span>
-                  ) : (
-                    <span className="text-slate-400 text-xs italic">Chưa có</span>
-                  )}
-                </td>
-                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
-                  <ActualHoursInput task={task} onRefresh={onRefresh} readOnly={!canEdit} />
-                </td>
-                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
-                  {task.drive_link ? (
-                    <a
-                      href={task.drive_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-medium transition-colors"
-                      title="Tải file từ Drive"
-                    >
-                      <Download size={14} />
-                      Tải về
-                    </a>
-                  ) : (
-                    <span className="text-slate-400 text-xs italic">Chưa có</span>
-                  )}
-                </td>
-                <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
-                  <button
-                    onClick={() => setCommentTaskId(task.id)}
-                    className="relative flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 border border-slate-200 hover:border-emerald-300 rounded-lg text-xs font-medium transition-colors"
-                    title="Xem bình luận"
-                  >
-                    <MessageSquare size={14} />
-                    {(commentCounts[task.id] ?? 0) > 0 && (
-                      <span className="bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                        {commentCounts[task.id]}
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span className={`text-sm ${getProductivityColor(rowTargetHours, rowHours)}`}>
+                          {rowHours > 0 ? `${((rowTargetHours / rowHours) * 100).toFixed(1)}%` : '-%'}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {rowTargetHours}h / {rowHours.toFixed(1)}h
+                          {childHasChildren && <span className="text-emerald-500 ml-1">Σ</span>}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      {rowCost != null && rowCost > 0 ? (
+                        <span className="text-sm font-medium text-slate-700">
+                          {rowCost.toLocaleString('vi-VN')} ₫
+                          {childHasChildren && <span className="text-emerald-500 ml-1 text-[10px]">Σ</span>}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">Chưa có</span>
+                      )}
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      <ActualHoursInput task={t} onRefresh={onRefresh} readOnly={!canEdit || childHasChildren} />
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      {t.drive_link ? (
+                        <a
+                          href={t.drive_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-medium transition-colors"
+                          title="Tải file từ Drive"
+                        >
+                          <Download size={14} />
+                          Tải về
+                        </a>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">Chưa có</span>
+                      )}
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      <button
+                        onClick={() => setCommentTaskId(t.id)}
+                        className="relative flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 border border-slate-200 hover:border-emerald-300 rounded-lg text-xs font-medium transition-colors"
+                        title="Xem bình luận"
+                      >
+                        <MessageSquare size={14} />
+                        {(commentCounts[t.id] ?? 0) > 0 && (
+                          <span className="bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                            {commentCounts[t.id]}
+                          </span>
+                        )}
+                      </button>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 text-right overflow-hidden whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1 relative">
+                        {t.viewer_link && (
+                          <button
+                            onClick={() => onViewDrawing(t.viewer_link!)}
+                            className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+                            title="Xem bản vẽ"
+                          >
+                            <Eye size={18} />
+                          </button>
+                        )}
+                        {t.drive_link && (
+                          <a
+                            href={t.drive_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Mở Drive"
+                          >
+                            <ExternalLink size={18} />
+                          </a>
+                        )}
+                        {(canEdit || canDelete) && (
+                          <button
+                            onClick={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                              setOpenMenuId(openMenuId === t.id ? null : t.id);
+                            }}
+                            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+                        )}
+                        {openMenuId === t.id && (
+                          <TaskContextMenu
+                            task={t}
+                            onClose={() => setOpenMenuId(null)}
+                            onRefresh={onRefresh}
+                            onEdit={(editedTask) => { setEditTask(editedTask); setOpenMenuId(null); }}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                            position={menuPos}
+                          />
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              };
+
+              return (
+                <React.Fragment key={task.id}>
+                  {/* Parent row */}
+                  <tr className={`hover:bg-slate-50/50 transition-colors group ${hasChildren ? 'border-l-2 border-l-emerald-400' : ''}`}>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        {hasChildren ? (
+                          <button
+                            onClick={() => setExpandedIds(prev => {
+                              const next = new Set(prev);
+                              if (next.has(task.id)) next.delete(task.id); else next.add(task.id);
+                              return next;
+                            })}
+                            className="flex-shrink-0 p-0.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                            title={isExpanded ? 'Thu gọn' : 'Mở rộng'}
+                          >
+                            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                          </button>
+                        ) : (
+                          <span className="flex-shrink-0 w-5" />
+                        )}
+                        <span
+                          className="font-medium text-slate-900 cursor-pointer"
+                          onClick={(e) => showCellTooltip(e, task.drawing_name)}
+                        >
+                          {task.drawing_name}
+                          {hasChildren && (
+                            <span className="ml-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                              {children.length} con
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden cursor-pointer" onClick={(e) => showCellTooltip(e, task.description)}>
+                      <div className="flex flex-col gap-0.5">
+                        {task.description ? (
+                          <span className="text-sm text-slate-700 line-clamp-2 whitespace-normal">{task.description}</span>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">Chưa có</span>
+                        )}
+                        <span className="text-xs text-slate-400">{new Date(task.created_at).toLocaleDateString('vi-VN')}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 text-sm text-slate-600 overflow-hidden whitespace-nowrap cursor-pointer" onClick={(e) => showCellTooltip(e, task.engineer_name)}>{task.engineer_name}</td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      <div className="flex gap-0.5">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            size={14}
+                            className={i < task.difficulty ? "text-amber-400 fill-amber-400" : "text-slate-200"}
+                          />
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status)}`}>
+                        {task.status}
                       </span>
-                    )}
-                  </button>
-                </td>
-                <td className="px-4 md:px-6 py-4 text-right overflow-hidden whitespace-nowrap">
-                  <div className="flex items-center justify-end gap-1 relative">
-                    {task.viewer_link && (
-                      <button 
-                        onClick={() => onViewDrawing(task.viewer_link!)}
-                        className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
-                        title="Xem bản vẽ"
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      {task.deadline ? (
+                        <div className="flex flex-col">
+                          <span className={`text-sm font-medium ${
+                            new Date(task.deadline) < new Date() && !isInactiveStatus(task.status)
+                              ? 'text-rose-600'
+                              : 'text-slate-700'
+                          }`}>
+                            {new Date(task.deadline).toLocaleDateString('vi-VN')}
+                          </span>
+                          {new Date(task.deadline) < new Date() && !isInactiveStatus(task.status) && (
+                            <span className="text-[10px] text-rose-500 font-bold uppercase">Quá hạn</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">Chưa đặt</span>
+                      )}
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span className={`text-sm ${getProductivityColor(displayTargetHours, displayHours)}`}>
+                          {displayHours > 0 ? `${((displayTargetHours / displayHours) * 100).toFixed(1)}%` : '-%'}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {displayTargetHours}h / {displayHours.toFixed(1)}h
+                          {hasChildren && <span className="text-emerald-500 ml-1">Σ</span>}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      {displayCost != null && displayCost > 0 ? (
+                        <span className="text-sm font-medium text-slate-700">
+                          {displayCost.toLocaleString('vi-VN')} ₫
+                          {hasChildren && <span className="text-emerald-500 ml-1 text-[10px]">Σ</span>}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">Chưa có</span>
+                      )}
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      <ActualHoursInput task={task} onRefresh={onRefresh} readOnly={!canEdit || hasChildren} />
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      {task.drive_link ? (
+                        <a
+                          href={task.drive_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-medium transition-colors"
+                          title="Tải file từ Drive"
+                        >
+                          <Download size={14} />
+                          Tải về
+                        </a>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">Chưa có</span>
+                      )}
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      <button
+                        onClick={() => setCommentTaskId(task.id)}
+                        className="relative flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 border border-slate-200 hover:border-emerald-300 rounded-lg text-xs font-medium transition-colors"
+                        title="Xem bình luận"
                       >
-                        <Eye size={18} />
+                        <MessageSquare size={14} />
+                        {(commentCounts[task.id] ?? 0) > 0 && (
+                          <span className="bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                            {commentCounts[task.id]}
+                          </span>
+                        )}
                       </button>
-                    )}
-                    {task.drive_link && (
-                      <a 
-                        href={task.drive_link} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Mở Drive"
-                      >
-                        <ExternalLink size={18} />
-                      </a>
-                    )}
-                    {(canEdit || canDelete) && (
-                      <button 
-                        onClick={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
-                          setOpenMenuId(openMenuId === task.id ? null : task.id);
-                        }}
-                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                      >
-                        <MoreVertical size={18} />
-                      </button>
-                    )}
-                    {openMenuId === task.id && (
-                      <TaskContextMenu
-                        task={task}
-                        onClose={() => setOpenMenuId(null)}
-                        onRefresh={onRefresh}
-                        onEdit={(t) => { setEditTask(t); setOpenMenuId(null); }}
-                        canEdit={canEdit}
-                        canDelete={canDelete}
-                        position={menuPos}
-                      />
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                    </td>
+                    <td className="px-4 md:px-6 py-4 text-right overflow-hidden whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1 relative">
+                        {task.viewer_link && (
+                          <button
+                            onClick={() => onViewDrawing(task.viewer_link!)}
+                            className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+                            title="Xem bản vẽ"
+                          >
+                            <Eye size={18} />
+                          </button>
+                        )}
+                        {task.drive_link && (
+                          <a
+                            href={task.drive_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Mở Drive"
+                          >
+                            <ExternalLink size={18} />
+                          </a>
+                        )}
+                        {(canEdit || canDelete) && (
+                          <button
+                            onClick={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                              setOpenMenuId(openMenuId === task.id ? null : task.id);
+                            }}
+                            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+                        )}
+                        {openMenuId === task.id && (
+                          <TaskContextMenu
+                            task={task}
+                            onClose={() => setOpenMenuId(null)}
+                            onRefresh={onRefresh}
+                            onEdit={(t) => { setEditTask(t); setOpenMenuId(null); }}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                            position={menuPos}
+                          />
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  {/* Child rows (shown when expanded) */}
+                  {isExpanded && children.map(child => renderTaskRow(child, true))}
+                </React.Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>

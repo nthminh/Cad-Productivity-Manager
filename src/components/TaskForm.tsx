@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, HardHat, User, FileText, Target, Star, Clock, CheckCircle2, DollarSign, Link, AlignLeft, ChevronDown } from 'lucide-react';
+import { X, Save, HardHat, User, FileText, Target, Star, Clock, CheckCircle2, DollarSign, Link, AlignLeft, ChevronDown, GitBranch } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, addDoc, query, orderBy, getDocs } from 'firebase/firestore';
-import { Engineer } from '../types/database.types';
+import { Engineer, Task } from '../types/database.types';
 
 interface TaskFormProps {
   onClose: () => void;
@@ -23,10 +23,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
     drive_link: '',
     viewer_link: '',
     deadline: '',
+    parentId: null as string | null,
   };
 
   const [formData, setFormData] = useState(initialFormData);
   const [engineers, setEngineers] = useState<Engineer[]>([]);
+  const [parentTasks, setParentTasks] = useState<Task[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +38,10 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
     if (!db) return;
     getDocs(query(collection(db, 'engineers'), orderBy('full_name'))).then(snap => {
       setEngineers(snap.docs.map(d => ({ id: d.id, ...d.data() }) as Engineer));
+    }).catch(console.error);
+    // Fetch all tasks and filter client-side for root tasks (no index required)
+    getDocs(query(collection(db, 'tasks'), orderBy('drawing_name'))).then(snap => {
+      setParentTasks(snap.docs.map(d => ({ id: d.id, ...d.data() }) as Task).filter(t => !t.parentId));
     }).catch(console.error);
   }, []);
 
@@ -57,6 +63,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
     try {
       await addDoc(collection(db, "tasks"), {
         ...formData,
+        parentId: formData.parentId || null,
         created_at: new Date().toISOString()
       });
       setFormData(initialFormData);
@@ -218,6 +225,26 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
                 </button>
               </div>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <GitBranch size={14} /> Dự án cha (tùy chọn)
+            </label>
+            <div className="relative">
+              <select
+                value={formData.parentId ?? ''}
+                onChange={e => setFormData({...formData, parentId: e.target.value || null})}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all appearance-none pr-10"
+              >
+                <option value="">-- Không có (Dự án độc lập) --</option>
+                {parentTasks.map(pt => (
+                  <option key={pt.id} value={pt.id}>{pt.drawing_name}</option>
+                ))}
+              </select>
+              <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+            <p className="text-[10px] text-slate-400 italic">* Chọn dự án cha để tạo dự án con (sub-task).</p>
           </div>
 
           <div className="space-y-1.5">

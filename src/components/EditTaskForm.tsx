@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, HardHat, User, FileText, Target, Star, Clock, CheckCircle2, DollarSign, Link, AlignLeft, ChevronDown } from 'lucide-react';
+import { X, Save, HardHat, User, FileText, Target, Star, Clock, CheckCircle2, DollarSign, Link, AlignLeft, ChevronDown, GitBranch } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, doc, updateDoc, query, orderBy, getDocs } from 'firebase/firestore';
 import { Task, Engineer } from '../types/database.types';
@@ -24,8 +24,10 @@ export const EditTaskForm: React.FC<EditTaskFormProps> = ({ task, onClose, onSuc
     drive_link: task.drive_link ?? '',
     viewer_link: task.viewer_link ?? '',
     deadline: task.deadline ?? '',
+    parentId: task.parentId ?? null as string | null,
   });
   const [engineers, setEngineers] = useState<Engineer[]>([]);
+  const [parentTasks, setParentTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -35,7 +37,15 @@ export const EditTaskForm: React.FC<EditTaskFormProps> = ({ task, onClose, onSuc
     getDocs(query(collection(db, 'engineers'), orderBy('full_name'))).then(snap => {
       setEngineers(snap.docs.map(d => ({ id: d.id, ...d.data() }) as Engineer));
     }).catch(console.error);
-  }, []);
+    // Fetch root tasks excluding the current task (to prevent circular references)
+    getDocs(query(collection(db, 'tasks'), orderBy('drawing_name'))).then(snap => {
+      setParentTasks(
+        snap.docs
+          .map(d => ({ id: d.id, ...d.data() }) as Task)
+          .filter(t => !t.parentId && t.id !== task.id)
+      );
+    }).catch(console.error);
+  }, [task.id]);
 
   useEffect(() => {
     if (!success) return;
@@ -52,7 +62,7 @@ export const EditTaskForm: React.FC<EditTaskFormProps> = ({ task, onClose, onSuc
     setLoading(true);
     setError(null);
     try {
-      await updateDoc(doc(db, 'tasks', task.id), { ...formData });
+      await updateDoc(doc(db, 'tasks', task.id), { ...formData, parentId: formData.parentId || null });
       onSuccess();
       setSuccess(true);
     } catch (err) {
@@ -206,6 +216,26 @@ export const EditTaskForm: React.FC<EditTaskFormProps> = ({ task, onClose, onSuc
                 </button>
               </div>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <GitBranch size={14} /> Dự án cha (tùy chọn)
+            </label>
+            <div className="relative">
+              <select
+                value={formData.parentId ?? ''}
+                onChange={e => setFormData({...formData, parentId: e.target.value || null})}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none pr-10"
+              >
+                <option value="">-- Không có (Dự án độc lập) --</option>
+                {parentTasks.map(pt => (
+                  <option key={pt.id} value={pt.id}>{pt.drawing_name}</option>
+                ))}
+              </select>
+              <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+            <p className="text-[10px] text-slate-400 italic">* Chọn dự án cha để đặt làm dự án con (sub-task).</p>
           </div>
 
           <div className="space-y-1.5">
