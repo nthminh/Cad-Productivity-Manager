@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ClipboardList, X, Users, DollarSign, BarChart3, LogOut, MessageCircle, Newspaper, Settings, CalendarDays } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, X, Users, DollarSign, BarChart3, LogOut, MessageCircle, Newspaper, Settings, CalendarDays, Network } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { type UserRole, getPermissions } from '../lib/permissions';
@@ -31,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
     { id: 'bulletin', label: 'Bảng tin', icon: Newspaper, visible: true },
     { id: 'chat', label: 'Chat nội bộ', icon: MessageCircle, visible: true },
     { id: 'calendar', label: 'Lịch nội bộ', icon: CalendarDays, visible: true },
+    { id: 'orgchart', label: 'Sơ đồ phòng ban', icon: Network, visible: true },
     { id: 'settings', label: 'Cài đặt', icon: Settings, visible: perms.canViewSettings },
   ];
 
