@@ -137,7 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
                   <img src={appUser.photoUrl} alt={appUser.displayName} className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-white text-sm font-bold">
-                    {appUser.displayName.slice(0, 2).toUpperCase()}
+                    {appUser.displayName.charAt(0).toUpperCase()}
                   </span>
                 )}
               </div>
