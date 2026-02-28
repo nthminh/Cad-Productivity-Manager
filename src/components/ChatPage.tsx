@@ -61,7 +61,7 @@ function renderTextWithMentions(text: string, currentUsername?: string) {
   const parts = text.split(/(@\w+|#\[[^\]]+\])/g);
   return parts.map((part, i) => {
     if (/^@\w+$/.test(part)) {
-      const isSelf = currentUsername && part === `@${currentUsername}`;
+      const isSelf = part === '@all' || (currentUsername && part === `@${currentUsername}`);
       return (
         <span
           key={i}
@@ -187,8 +187,9 @@ export const ChatPage: React.FC<{ onMentionCountChange?: (count: number) => void
     }
   };
 
+  const ALL_USER_ENTRY = { username: 'all', displayName: 'Tất cả mọi người' };
   const filteredUsers = mentionQuery !== null
-    ? allUsers.filter(
+    ? [ALL_USER_ENTRY, ...allUsers].filter(
         (u) =>
           u.username.toLowerCase().includes(mentionQuery) ||
           u.displayName.toLowerCase().includes(mentionQuery)
@@ -241,7 +242,11 @@ export const ChatPage: React.FC<{ onMentionCountChange?: (count: number) => void
   // Create mention notifications and send emails for all mentioned users
   const notifyMentions = async (mentions: string[], messageId: string, messageText: string) => {
     if (!db || !currentUser || mentions.length === 0) return;
-    const uniqueMentions = [...new Set(mentions)].filter((m) => m !== currentUser.username);
+    // Expand @all to all individual usernames
+    const expandedMentions = mentions.includes('all')
+      ? [...new Set([...allUsers.map((u) => u.username), ...mentions.filter((m) => m !== 'all')])]
+      : mentions;
+    const uniqueMentions = [...new Set(expandedMentions)].filter((m) => m !== currentUser.username);
     // Fetch engineer email cache once for all mentions in this message
     const emailCache = await getEngineerEmailCache();
     await Promise.all(
