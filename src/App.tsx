@@ -657,7 +657,6 @@ export default function App() {
             <div className="space-y-6">
               <ChatNotificationBanner
                 mentionCount={mentionCount}
-                taskMentionCount={taskMentionCount}
                 newMessageCount={newChatMessageCount}
                 onNavigateToChat={() => setActiveTab('chat')}
                 onDismissNewMessages={() => {
