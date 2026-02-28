@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Users, Clock, Award } from 'lucide-react';
+import { BarChart3, TrendingUp, Clock, Award } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -108,42 +108,6 @@ export const ReportsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="bg-blue-100 p-2 rounded-lg"><Users size={18} className="text-blue-600" /></div>
-            <span className="text-sm font-semibold text-slate-600">Kỹ sư</span>
-          </div>
-          <p className="text-2xl font-bold text-slate-900">{engineers.length}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="bg-emerald-100 p-2 rounded-lg"><BarChart3 size={18} className="text-emerald-600" /></div>
-            <span className="text-sm font-semibold text-slate-600">Tổng dự án</span>
-          </div>
-          <p className="text-2xl font-bold text-slate-900">{tasks.length}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="bg-amber-100 p-2 rounded-lg"><Clock size={18} className="text-amber-600" /></div>
-            <span className="text-sm font-semibold text-slate-600">Tổng giờ thực tế</span>
-          </div>
-          <p className="text-2xl font-bold text-slate-900">
-            {tasks.reduce((s, t) => s + t.actual_hours, 0).toFixed(1)}h
-          </p>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="bg-rose-100 p-2 rounded-lg"><TrendingUp size={18} className="text-rose-600" /></div>
-            <span className="text-sm font-semibold text-slate-600">Hoàn thành</span>
-          </div>
-          <p className="text-2xl font-bold text-slate-900">
-            {tasks.filter(t => t.status === 'Hoàn thành').length}
-          </p>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Engineer Productivity Chart */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
