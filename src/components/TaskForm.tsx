@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, HardHat, User, FileText, Target, Star, Clock, CheckCircle2, DollarSign, Link, AlignLeft, ChevronDown, GitBranch } from 'lucide-react';
+import { X, Save, HardHat, User, FileText, Target, Star, Clock, CheckCircle2, DollarSign, Link, AlignLeft, ChevronDown, GitBranch, ExternalLink } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, addDoc, query, orderBy, getDocs } from 'firebase/firestore';
 import { Engineer, Task } from '../types/database.types';
@@ -85,7 +85,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
             <div className="bg-emerald-500 p-2 rounded-lg">
               <HardHat className="text-white" size={20} />
             </div>
-            <h2 className="font-bold text-slate-900 text-lg">Thêm dự án mới</h2>
+            <h2 className="font-bold text-slate-900 text-lg">Thêm công việc mới</h2>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-rose-500 transition-colors">
             <X size={24} />
@@ -101,13 +101,13 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
           {success && (
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 font-medium flex items-center gap-2">
               <CheckCircle2 size={16} />
-              Thêm dự án thành công!
+              Thêm công việc thành công!
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-                <FileText size={14} /> Tên dự án
+                <FileText size={14} /> Tên công việc
               </label>
               <input
                 required
@@ -229,7 +229,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-              <GitBranch size={14} /> Dự án cha (tùy chọn)
+              <GitBranch size={14} /> Công việc cha (tùy chọn)
             </label>
             <div className="relative">
               <select
@@ -237,32 +237,35 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
                 onChange={e => setFormData({...formData, parentId: e.target.value || null})}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all appearance-none pr-10"
               >
-                <option value="">-- Không có (Dự án độc lập) --</option>
+                <option value="">-- Không có (Công việc độc lập) --</option>
                 {parentTasks.map(pt => (
                   <option key={pt.id} value={pt.id}>{pt.drawing_name}</option>
                 ))}
               </select>
               <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
-            <p className="text-[10px] text-slate-400 italic">* Chọn dự án cha để tạo dự án con (sub-task).</p>
+            <p className="text-[10px] text-slate-400 italic">* Chọn công việc cha để tạo công việc con (sub-task).</p>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-              <AlignLeft size={14} /> Thông tin dự án
+              <AlignLeft size={14} /> Thông tin công việc
             </label>
             <textarea
               value={formData.description}
               onChange={e => setFormData({...formData, description: e.target.value})}
-              placeholder="Nhập thông tin cơ bản của dự án (mô tả, yêu cầu, ghi chú...)"
+              placeholder="Nhập thông tin cơ bản của công việc (mô tả, yêu cầu, ghi chú...)"
               rows={4}
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all resize-none"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-              <Link size={14} /> Link xem bản vẽ (Viewer)
+            <label className="text-xs font-bold text-slate-500 uppercase flex items-center justify-between gap-1.5">
+              <span className="flex items-center gap-1.5"><Link size={14} /> Link xem bản vẽ (Viewer)</span>
+              <a href="https://drive.google.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[10px] font-medium text-blue-500 hover:text-blue-700 normal-case transition-colors" title="Mở Google Drive để tìm file">
+                <ExternalLink size={11} /> Mở Google Drive
+              </a>
             </label>
             <input
               value={formData.viewer_link}
@@ -274,8 +277,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-              <Link size={14} /> Link Google Drive (Folder/File)
+            <label className="text-xs font-bold text-slate-500 uppercase flex items-center justify-between gap-1.5">
+              <span className="flex items-center gap-1.5"><Link size={14} /> Link Google Drive (Folder/File)</span>
+              <a href="https://drive.google.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[10px] font-medium text-blue-500 hover:text-blue-700 normal-case transition-colors" title="Mở Google Drive để tìm thư mục">
+                <ExternalLink size={11} /> Mở Google Drive
+              </a>
             </label>
             <input
               value={formData.drive_link}
@@ -299,7 +305,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSuccess }) => {
               className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
             >
               <Save size={20} />
-              {loading ? 'Đang lưu...' : 'Lưu dự án'}
+              {loading ? 'Đang lưu...' : 'Lưu công việc'}
             </button>
           </div>
         </form>

@@ -31,7 +31,7 @@ export const ChatNotificationBanner: React.FC<ChatNotificationBannerProps> = ({
         {taskMentionCount > 0 && (
           <p className="text-sm text-emerald-800">
             <Bell size={13} className="inline text-rose-500 mr-1 flex-shrink-0" />
-            Bạn được nhắc đến <strong>{taskMentionCount}</strong> lần trong bình luận dự án.
+            Bạn được nhắc đến <strong>{taskMentionCount}</strong> lần trong bình luận công việc.
           </p>
         )}
         {mentionCount > 0 && (

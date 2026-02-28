@@ -312,7 +312,7 @@ export default function App() {
                   : activeTab === 'engineers'
                   ? 'Quản lý thông tin công ty và nhân viên.'
                   : activeTab === 'salary'
-                  ? 'Quản lý lương căn bản và lương theo dự án.'
+                  ? 'Quản lý lương căn bản và lương theo công việc hoàn thành.'
                   : activeTab === 'chat'
                   ? 'Nhắn tin và trao đổi với các thành viên trong nhóm.'
                   : activeTab === 'bulletin'
@@ -384,7 +384,7 @@ export default function App() {
               {/* Primary stat cards */}
               <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                 <StatCard 
-                  title="Tổng số dự án" 
+                  title="Tổng số công việc" 
                   value={totalTasks} 
                   icon={Files} 
                   color="blue"
@@ -453,7 +453,7 @@ export default function App() {
                 <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-700">
                   <AlertCircle size={20} className="flex-shrink-0" />
                   <p className="text-sm font-medium">
-                    Có <span className="font-bold">{overdueTaskCount}</span> dự án đã quá hạn và chưa hoàn thành.
+                    Có <span className="font-bold">{overdueTaskCount}</span> công việc đã quá hạn và chưa hoàn thành.
                     <button
                       onClick={() => setActiveTab('tasks')}
                       className="ml-2 underline font-semibold hover:text-rose-900 transition-colors"

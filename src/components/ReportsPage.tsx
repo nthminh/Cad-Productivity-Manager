@@ -159,7 +159,7 @@ export const ReportsPage: React.FC = () => {
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-5">
             <BarChart3 className="text-blue-500" size={18} />
-            Phân bổ trạng thái dự án
+            Phân bổ trạng thái công việc
           </h3>
           {statusCounts.length === 0 ? (
             <p className="text-slate-400 text-sm text-center py-10">Chưa có dữ liệu</p>
@@ -230,7 +230,7 @@ export const ReportsPage: React.FC = () => {
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-5">
             <BarChart3 className="text-purple-500" size={18} />
-            Phân bổ độ khó dự án
+            Phân bổ độ khó công việc
           </h3>
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
