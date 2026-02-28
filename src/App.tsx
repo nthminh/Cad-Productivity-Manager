@@ -27,7 +27,6 @@ import { TaskForm } from './components/TaskForm';
 import { EngineerList } from './components/EngineerList';
 import { SalaryPage } from './components/SalaryPage';
 import { ReportsPage } from './components/ReportsPage';
-import { SettingsPage } from './components/SettingsPage';
 import { ChatPage } from './components/ChatPage';
 import { BulletinBoardPage } from './components/BulletinBoardPage';
 import { LoginGate } from './components/LoginGate';
@@ -68,7 +67,7 @@ export default function App() {
       setError(null);
     }, (err) => {
       console.error("Error fetching tasks from Firebase:", err);
-      setError("Không thể kết nối với Firebase. Vui lòng kiểm tra cấu hình.");
+      setError("Không thể kết nối với Firebase. Vui lòng kiểm tra cấu hình và biến môi trường của bạn.");
       setLoading(false);
     });
 
@@ -126,13 +125,12 @@ export default function App() {
             </button>
             <div>
               <h2 className="text-xl lg:text-3xl font-bold text-slate-900 tracking-tight">
-                {activeTab === 'dashboard' ? 'Tổng quan' : 
+                {activeTab === 'dashboard' ? 'Tổng quan' :
                  activeTab === 'tasks' ? 'Quản lý dự án' :
                  activeTab === 'engineers' ? 'Danh sách kỹ sư' :
                  activeTab === 'salary' ? 'Tính lương' :
                  activeTab === 'chat' ? 'Chat nội bộ' :
                  activeTab === 'bulletin' ? 'Bảng tin' :
-                 activeTab === 'settings' ? 'Cài đặt' :
                  'Báo cáo'}
               </h2>
               <p className="text-slate-500 mt-1 text-xs lg:text-base hidden sm:block">
@@ -148,8 +146,6 @@ export default function App() {
                   ? 'Nhắn tin và trao đổi với các thành viên trong nhóm.'
                   : activeTab === 'bulletin'
                   ? 'Cập nhật tin tức và thông báo của công ty.'
-                  : activeTab === 'settings'
-                  ? 'Cấu hình kết nối Firebase Firestore.'
                   : 'Thống kê và phân tích hiệu suất toàn đội.'}
               </p>
             </div>
@@ -179,17 +175,7 @@ export default function App() {
           {error && (
             <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-700">
               <AlertCircle size={20} />
-              <p className="text-sm font-medium">
-                {error}
-                {!isFirebaseConfigured && perms.canViewSettings && (
-                  <button
-                    onClick={() => setActiveTab('settings')}
-                    className="ml-2 underline font-semibold hover:text-rose-900 transition-colors"
-                  >
-                    Vào Cài đặt →
-                  </button>
-                )}
-              </p>
+              <p className="text-sm font-medium">{error}</p>
             </div>
           )}
 
@@ -203,8 +189,6 @@ export default function App() {
             <ChatPage />
           ) : activeTab === 'bulletin' ? (
             <BulletinBoardPage userRole={role} />
-          ) : activeTab === 'settings' && perms.canViewSettings ? (
-            <SettingsPage />
           ) : activeTab === 'dashboard' ? (
             <div className="space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
