@@ -151,14 +151,39 @@ export const TaskCommentSection: React.FC<Props> = ({ taskId, taskName, onClose 
     setSending(true);
     setSendError(null);
     try {
+      const mentions = extractMentions(text);
       await addDoc(collection(db, 'task_comments'), {
         task_id: taskId,
         text,
         sender: currentUser.displayName,
         username: currentUser.username,
         createdAt: serverTimestamp(),
-        mentions: extractMentions(text),
+        mentions,
       });
+      // Create mention notifications for mentioned users
+      const allUsers = getUsers().map((u) => ({ username: u.username, displayName: u.displayName }));
+      const expandedMentions = mentions.includes('all')
+        ? [...new Set([...allUsers.map((u) => u.username), ...mentions.filter((m) => m !== 'all')])]
+        : mentions;
+      const uniqueMentions = [...new Set(expandedMentions)].filter((m) => m !== currentUser.username);
+      await Promise.all(
+        uniqueMentions.map(async (mentionedUsername) => {
+          try {
+            await addDoc(collection(db, 'mention_notifications'), {
+              mentionedUsername,
+              mentionerName: currentUser.displayName,
+              messageText: text,
+              messageId: taskId,
+              acknowledged: false,
+              source: 'task',
+              sourceTitle: taskName,
+              createdAt: serverTimestamp(),
+            });
+          } catch (e) {
+            console.error('Failed to create task mention notification:', e);
+          }
+        }),
+      );
       setInput('');
       if (inputRef.current) inputRef.current.style.height = 'auto';
       setMentionQuery(null);

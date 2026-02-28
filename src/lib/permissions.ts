@@ -1,16 +1,18 @@
-export type UserRole = 'admin' | 'manager' | 'engineer';
+export type UserRole = 'admin' | 'manager' | 'engineer' | 'employee';
 type NonAdminRole = Exclude<UserRole, 'admin'>;
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Quản trị viên',
   manager: 'Quản lý',
   engineer: 'Kỹ sư',
+  employee: 'Nhân viên',
 };
 
 export const ROLE_BADGE_COLORS: Record<UserRole, string> = {
   admin: 'bg-rose-100 text-rose-700 border-rose-200',
   manager: 'bg-blue-100 text-blue-700 border-blue-200',
   engineer: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  employee: 'bg-amber-100 text-amber-700 border-amber-200',
 };
 
 export interface Permissions {
@@ -73,6 +75,17 @@ const DEFAULT_ROLE_PERMISSIONS: Record<Exclude<UserRole, 'admin'>, Permissions> 
     canViewReports: false,
     canViewSettings: false,
   },
+  employee: {
+    canAddTask: false,
+    canEditTask: false,
+    canDeleteTask: false,
+    canViewEngineers: false,
+    canManageEngineers: false,
+    canViewSalary: false,
+    canEditSalary: false,
+    canViewReports: false,
+    canViewSettings: false,
+  },
 };
 
 const CUSTOM_PERMISSIONS_KEY = 'app_role_permissions';
@@ -83,8 +96,8 @@ export function getCustomRolePermissions(): Record<Exclude<UserRole, 'admin'>, P
     const stored = localStorage.getItem(CUSTOM_PERMISSIONS_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as Record<string, Permissions>;
-      // Validate that both required role keys are present with all expected permission keys
-      const expectedRoles: NonAdminRole[] = ['manager', 'engineer'];
+      // Validate that all required role keys are present with all expected permission keys
+      const expectedRoles: NonAdminRole[] = ['manager', 'engineer', 'employee'];
       const expectedPerms = Object.keys(DEFAULT_ROLE_PERMISSIONS.manager) as (keyof Permissions)[];
       const isValid = expectedRoles.every(
         (r) =>

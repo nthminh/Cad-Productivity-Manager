@@ -24,10 +24,12 @@ interface SidebarProps {
   userRole: UserRole;
   onLogout: () => void;
   mentionCount?: number;
+  taskMentionCount?: number;
+  bulletinMentionCount?: number;
   appUser?: SidebarUser | null;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, userRole, onLogout, mentionCount = 0, appUser }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, userRole, onLogout, mentionCount = 0, taskMentionCount = 0, bulletinMentionCount = 0, appUser }) => {
   const perms = getPermissions(userRole);
 
   const allMenuItems = [
@@ -105,6 +107,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
               {item.id === 'chat' && mentionCount > 0 && (
                 <span className="min-w-[20px] h-5 flex items-center justify-center bg-rose-500 text-white text-xs font-bold rounded-full px-1.5">
                   {mentionCount > 99 ? '99+' : mentionCount}
+                </span>
+              )}
+              {item.id === 'tasks' && taskMentionCount > 0 && (
+                <span className="min-w-[20px] h-5 flex items-center justify-center bg-rose-500 text-white text-xs font-bold rounded-full px-1.5">
+                  {taskMentionCount > 99 ? '99+' : taskMentionCount}
+                </span>
+              )}
+              {item.id === 'bulletin' && bulletinMentionCount > 0 && (
+                <span className="min-w-[20px] h-5 flex items-center justify-center bg-rose-500 text-white text-xs font-bold rounded-full px-1.5">
+                  {bulletinMentionCount > 99 ? '99+' : bulletinMentionCount}
                 </span>
               )}
             </button>

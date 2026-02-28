@@ -39,6 +39,8 @@ interface MentionNotification {
   messageId: string;
   acknowledged: boolean;
   createdAt: Timestamp | null;
+  source?: 'chat' | 'task' | 'bulletin';
+  sourceTitle?: string;
 }
 
 function formatFileSize(bytes: number): string {
@@ -126,7 +128,7 @@ export const ChatPage: React.FC<{ onMentionCountChange?: (count: number) => void
     setAllUsers(getUsers().map((u) => ({ username: u.username, displayName: u.displayName })));
   }, []);
 
-  // Subscribe to unacknowledged mention notifications for the current user
+  // Subscribe to unacknowledged mention notifications for the current user (chat source only)
   useEffect(() => {
     if (!db || !currentUser) return;
     const q = query(
@@ -137,6 +139,7 @@ export const ChatPage: React.FC<{ onMentionCountChange?: (count: number) => void
     const unsub = onSnapshot(q, (snap) => {
       const sorted = snap.docs
         .map((d) => ({ id: d.id, ...d.data() }) as MentionNotification)
+        .filter((n) => !n.source || n.source === 'chat')
         .sort((a, b) => {
           const ta = a.createdAt?.toMillis() ?? 0;
           const tb = b.createdAt?.toMillis() ?? 0;
@@ -259,6 +262,7 @@ export const ChatPage: React.FC<{ onMentionCountChange?: (count: number) => void
             messageText,
             messageId,
             acknowledged: false,
+            source: 'chat',
             createdAt: serverTimestamp(),
           });
         } catch (e) {

@@ -247,7 +247,7 @@ export const SettingsPage: React.FC = () => {
     }));
   };
 
-  const nonAdminRoles: NonAdminRole[] = ['manager', 'engineer'];
+  const nonAdminRoles: NonAdminRole[] = ['manager', 'engineer', 'employee'];
   const permKeys = Object.keys(PERMISSION_LABELS) as (keyof Permissions)[];
 
   return (
