@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -6,6 +6,9 @@ import {
   Trash2,
   Calendar,
   X,
+  Edit2,
+  AtSign,
+  Hash,
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import {
@@ -18,8 +21,10 @@ import {
   serverTimestamp,
   Timestamp,
   orderBy,
+  updateDoc,
 } from 'firebase/firestore';
-import { getCurrentUser } from '../lib/auth';
+import { getCurrentUser, getUsers } from '../lib/auth';
+import { useProjectNames } from '../lib/useProjectNames';
 import {
   startOfMonth,
   endOfMonth,
@@ -60,6 +65,33 @@ function getColorConfig(colorKey?: string) {
 
 const DOW_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
+const ALL_USER_ENTRY = { username: 'all', displayName: 'Tất cả mọi người' };
+
+function renderTextWithMentions(text: string, currentUsername?: string) {
+  const parts = text.split(/(@\w+|#\[[^\]]+\])/g);
+  return parts.map((part, i) => {
+    if (/^@\w+$/.test(part)) {
+      const isSelf = part === '@all' || (currentUsername && part === `@${currentUsername}`);
+      return (
+        <span
+          key={i}
+          className={`font-semibold ${isSelf ? 'bg-yellow-200 text-yellow-800 rounded px-0.5' : 'text-emerald-600'}`}
+        >
+          {part}
+        </span>
+      );
+    }
+    if (/^#\[.+\]$/.test(part)) {
+      return (
+        <span key={i} className="font-semibold text-blue-500">
+          {part}
+        </span>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
 export const InternalCalendarPage: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -70,7 +102,38 @@ export const InternalCalendarPage: React.FC = () => {
   const [newColor, setNewColor] = useState('emerald');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Edit state
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editColor, setEditColor] = useState('emerald');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // @ mention state for add form
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [projectMentionQuery, setProjectMentionQuery] = useState<string | null>(null);
+  const [activeMentionField, setActiveMentionField] = useState<'title' | 'desc' | null>(null);
+
+  // @ mention state for edit form
+  const [editMentionQuery, setEditMentionQuery] = useState<string | null>(null);
+  const [editProjectMentionQuery, setEditProjectMentionQuery] = useState<string | null>(null);
+  const [editActiveMentionField, setEditActiveMentionField] = useState<'title' | 'desc' | null>(null);
+
+  const [allUsers, setAllUsers] = useState<{ username: string; displayName: string }[]>([]);
+  const projectNames = useProjectNames();
+
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const descInputRef = useRef<HTMLInputElement>(null);
+  const editTitleInputRef = useRef<HTMLInputElement>(null);
+  const editDescInputRef = useRef<HTMLInputElement>(null);
+
   const currentUser = getCurrentUser();
+
+  useEffect(() => {
+    setAllUsers(getUsers().map((u) => ({ username: u.username, displayName: u.displayName })));
+  }, []);
 
   useEffect(() => {
     if (!db) return;
@@ -130,8 +193,146 @@ export const InternalCalendarPage: React.FC = () => {
     }
   };
 
+  const handleEditEvent = async () => {
+    if (!editingEventId || !editTitle.trim() || !db) return;
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      await updateDoc(doc(db, 'calendar_events', editingEventId), {
+        title: editTitle.trim(),
+        description: editDesc.trim() || null,
+        color: editColor,
+      });
+      setEditingEventId(null);
+      setEditMentionQuery(null);
+      setEditProjectMentionQuery(null);
+    } catch (err) {
+      console.error('Edit event error:', err);
+      setEditError('Không thể cập nhật sự kiện. Vui lòng thử lại.');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const startEditEvent = (ev: CalendarEvent) => {
+    setEditingEventId(ev.id);
+    setEditTitle(ev.title);
+    setEditDesc(ev.description ?? '');
+    setEditColor(ev.color ?? 'emerald');
+    setEditError(null);
+    setEditMentionQuery(null);
+    setEditProjectMentionQuery(null);
+  };
+
+  const canEditEvent = (event: CalendarEvent) =>
+    event.createdByUsername === currentUser?.username || currentUser?.role === 'admin';
+
   const canDeleteEvent = (event: CalendarEvent) =>
     event.createdByUsername === currentUser?.username || currentUser?.role === 'admin';
+
+  // Mention helpers for add form
+  const filteredUsers = mentionQuery !== null
+    ? [ALL_USER_ENTRY, ...allUsers].filter(
+        (u) =>
+          u.username.toLowerCase().includes(mentionQuery) ||
+          u.displayName.toLowerCase().includes(mentionQuery),
+      )
+    : [];
+
+  const filteredProjects = projectMentionQuery !== null
+    ? projectNames.filter((p) => p.toLowerCase().includes(projectMentionQuery)).slice(0, 6)
+    : [];
+
+  const handleMentionInput = (val: string, field: 'title' | 'desc') => {
+    setActiveMentionField(field);
+    const mentionMatch = val.match(/@(\w*)$/);
+    if (mentionMatch) {
+      setMentionQuery(mentionMatch[1].toLowerCase());
+      setProjectMentionQuery(null);
+    } else {
+      setMentionQuery(null);
+      const projMatch = val.match(/#([^#\n]*)$/);
+      if (projMatch) {
+        setProjectMentionQuery(projMatch[1].toLowerCase());
+      } else {
+        setProjectMentionQuery(null);
+      }
+    }
+  };
+
+  const insertMention = (username: string) => {
+    if (activeMentionField === 'title') {
+      setNewTitle((v) => v.replace(/@(\w*)$/, `@${username} `));
+      setTimeout(() => titleInputRef.current?.focus(), 0);
+    } else {
+      setNewDesc((v) => v.replace(/@(\w*)$/, `@${username} `));
+      setTimeout(() => descInputRef.current?.focus(), 0);
+    }
+    setMentionQuery(null);
+  };
+
+  const insertProjectMention = (projectName: string) => {
+    if (activeMentionField === 'title') {
+      setNewTitle((v) => v.replace(/#([^#\n]*)$/, `#[${projectName}] `));
+      setTimeout(() => titleInputRef.current?.focus(), 0);
+    } else {
+      setNewDesc((v) => v.replace(/#([^#\n]*)$/, `#[${projectName}] `));
+      setTimeout(() => descInputRef.current?.focus(), 0);
+    }
+    setProjectMentionQuery(null);
+  };
+
+  // Mention helpers for edit form
+  const editFilteredUsers = editMentionQuery !== null
+    ? [ALL_USER_ENTRY, ...allUsers].filter(
+        (u) =>
+          u.username.toLowerCase().includes(editMentionQuery) ||
+          u.displayName.toLowerCase().includes(editMentionQuery),
+      )
+    : [];
+
+  const editFilteredProjects = editProjectMentionQuery !== null
+    ? projectNames.filter((p) => p.toLowerCase().includes(editProjectMentionQuery)).slice(0, 6)
+    : [];
+
+  const handleEditMentionInput = (val: string, field: 'title' | 'desc') => {
+    setEditActiveMentionField(field);
+    const mentionMatch = val.match(/@(\w*)$/);
+    if (mentionMatch) {
+      setEditMentionQuery(mentionMatch[1].toLowerCase());
+      setEditProjectMentionQuery(null);
+    } else {
+      setEditMentionQuery(null);
+      const projMatch = val.match(/#([^#\n]*)$/);
+      if (projMatch) {
+        setEditProjectMentionQuery(projMatch[1].toLowerCase());
+      } else {
+        setEditProjectMentionQuery(null);
+      }
+    }
+  };
+
+  const insertEditMention = (username: string) => {
+    if (editActiveMentionField === 'title') {
+      setEditTitle((v) => v.replace(/@(\w*)$/, `@${username} `));
+      setTimeout(() => editTitleInputRef.current?.focus(), 0);
+    } else {
+      setEditDesc((v) => v.replace(/@(\w*)$/, `@${username} `));
+      setTimeout(() => editDescInputRef.current?.focus(), 0);
+    }
+    setEditMentionQuery(null);
+  };
+
+  const insertEditProjectMention = (projectName: string) => {
+    if (editActiveMentionField === 'title') {
+      setEditTitle((v) => v.replace(/#([^#\n]*)$/, `#[${projectName}] `));
+      setTimeout(() => editTitleInputRef.current?.focus(), 0);
+    } else {
+      setEditDesc((v) => v.replace(/#([^#\n]*)$/, `#[${projectName}] `));
+      setTimeout(() => editDescInputRef.current?.focus(), 0);
+    }
+    setEditProjectMentionQuery(null);
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
@@ -231,22 +432,61 @@ export const InternalCalendarPage: React.FC = () => {
           {/* Add event form */}
           {showAddForm && (
             <div className="mb-3 p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+              {/* @ mention dropdown for add form */}
+              {mentionQuery !== null && filteredUsers.length > 0 && (
+                <div className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                  {filteredUsers.slice(0, 6).map((u) => (
+                    <button
+                      key={u.username}
+                      type="button"
+                      onClick={() => insertMention(u.username)}
+                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-emerald-50 text-left text-sm"
+                    >
+                      <AtSign size={14} className="text-emerald-500 flex-shrink-0" />
+                      <span className="font-medium text-slate-800">{u.displayName}</span>
+                      <span className="text-slate-400 text-xs">@{u.username}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* # project mention dropdown for add form */}
+              {projectMentionQuery !== null && filteredProjects.length > 0 && (
+                <div className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                  {filteredProjects.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => insertProjectMention(p)}
+                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-blue-50 text-left text-sm"
+                    >
+                      <Hash size={14} className="text-blue-500 flex-shrink-0" />
+                      <span className="font-medium text-slate-800">{p}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <input
+                ref={titleInputRef}
                 type="text"
                 value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
+                onChange={(e) => { setNewTitle(e.target.value); handleMentionInput(e.target.value, 'title'); }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleAddEvent();
+                  if (e.key === 'Escape') { setMentionQuery(null); setProjectMentionQuery(null); }
                 }}
-                placeholder="Tên sự kiện *"
+                placeholder="Tên sự kiện * (@ nhắc ai đó, # nhắc đề án)"
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                 autoFocus
               />
               <input
+                ref={descInputRef}
                 type="text"
                 value={newDesc}
-                onChange={(e) => setNewDesc(e.target.value)}
-                placeholder="Ghi chú (tuỳ chọn)"
+                onChange={(e) => { setNewDesc(e.target.value); handleMentionInput(e.target.value, 'desc'); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') { setMentionQuery(null); setProjectMentionQuery(null); }
+                }}
+                placeholder="Ghi chú (@ nhắc ai đó, # nhắc đề án)"
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
               />
               <div className="flex items-center gap-1.5">
@@ -272,6 +512,8 @@ export const InternalCalendarPage: React.FC = () => {
                     setSaveError(null);
                     setNewTitle('');
                     setNewDesc('');
+                    setMentionQuery(null);
+                    setProjectMentionQuery(null);
                   }}
                   className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 hover:bg-slate-100 transition-colors"
                 >
@@ -299,27 +541,133 @@ export const InternalCalendarPage: React.FC = () => {
             )}
             {selectedEvents.map((ev) => {
               const colorConf = getColorConfig(ev.color);
+              const isEditing = editingEventId === ev.id;
               return (
-                <div
-                  key={ev.id}
-                  className={`flex items-start gap-2 p-3 rounded-xl border ${colorConf.bgClass}`}
-                >
-                  <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${colorConf.dotClass}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 break-words">{ev.title}</p>
-                    {ev.description && (
-                      <p className="text-xs text-slate-500 mt-0.5 break-words">{ev.description}</p>
-                    )}
-                    <p className="text-xs text-slate-400 mt-1">{ev.createdBy}</p>
-                  </div>
-                  {canDeleteEvent(ev) && (
-                    <button
-                      onClick={() => handleDeleteEvent(ev.id)}
-                      className="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded transition-colors flex-shrink-0"
-                      title="Xóa sự kiện"
+                <div key={ev.id}>
+                  {isEditing ? (
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                      {/* @ mention dropdown for edit form */}
+                      {editMentionQuery !== null && editFilteredUsers.length > 0 && (
+                        <div className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                          {editFilteredUsers.slice(0, 6).map((u) => (
+                            <button
+                              key={u.username}
+                              type="button"
+                              onClick={() => insertEditMention(u.username)}
+                              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-emerald-50 text-left text-sm"
+                            >
+                              <AtSign size={14} className="text-emerald-500 flex-shrink-0" />
+                              <span className="font-medium text-slate-800">{u.displayName}</span>
+                              <span className="text-slate-400 text-xs">@{u.username}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {/* # project mention dropdown for edit form */}
+                      {editProjectMentionQuery !== null && editFilteredProjects.length > 0 && (
+                        <div className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                          {editFilteredProjects.map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => insertEditProjectMention(p)}
+                              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-blue-50 text-left text-sm"
+                            >
+                              <Hash size={14} className="text-blue-500 flex-shrink-0" />
+                              <span className="font-medium text-slate-800">{p}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <input
+                        ref={editTitleInputRef}
+                        type="text"
+                        value={editTitle}
+                        onChange={(e) => { setEditTitle(e.target.value); handleEditMentionInput(e.target.value, 'title'); }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') { setEditMentionQuery(null); setEditProjectMentionQuery(null); }
+                        }}
+                        placeholder="Tên sự kiện *"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                        autoFocus
+                      />
+                      <input
+                        ref={editDescInputRef}
+                        type="text"
+                        value={editDesc}
+                        onChange={(e) => { setEditDesc(e.target.value); handleEditMentionInput(e.target.value, 'desc'); }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') { setEditMentionQuery(null); setEditProjectMentionQuery(null); }
+                        }}
+                        placeholder="Ghi chú (tuỳ chọn)"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-slate-500 mr-1">Màu:</span>
+                        {EVENT_COLORS.map((c) => (
+                          <button
+                            key={c.key}
+                            type="button"
+                            onClick={() => setEditColor(c.key)}
+                            title={c.label}
+                            className={`w-5 h-5 rounded-full ${c.dotClass} transition-transform ${
+                              editColor === c.key ? 'ring-2 ring-offset-1 ring-slate-400 scale-125' : ''
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      {editError && <p className="text-xs text-rose-600">{editError}</p>}
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => { setEditingEventId(null); setEditMentionQuery(null); setEditProjectMentionQuery(null); }}
+                          className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 hover:bg-slate-100 transition-colors"
+                        >
+                          Hủy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleEditEvent}
+                          disabled={editSaving || !editTitle.trim()}
+                          className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-lg text-xs font-medium transition-colors"
+                        >
+                          {editSaving ? 'Đang lưu...' : 'Cập nhật'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className={`flex items-start gap-2 p-3 rounded-xl border ${colorConf.bgClass}`}
                     >
-                      <Trash2 size={13} />
-                    </button>
+                      <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${colorConf.dotClass}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 break-words">{renderTextWithMentions(ev.title, currentUser?.username)}</p>
+                        {ev.description && (
+                          <p className="text-xs text-slate-500 mt-0.5 break-words">{renderTextWithMentions(ev.description, currentUser?.username)}</p>
+                        )}
+                        <p className="text-xs text-slate-400 mt-1">{ev.createdBy}</p>
+                      </div>
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                        {canEditEvent(ev) && (
+                          <button
+                            onClick={() => startEditEvent(ev)}
+                            className="p-1 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded transition-colors"
+                            title="Chỉnh sửa sự kiện"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                        )}
+                        {canDeleteEvent(ev) && (
+                          <button
+                            onClick={() => handleDeleteEvent(ev.id)}
+                            className="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded transition-colors"
+                            title="Xóa sự kiện"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               );

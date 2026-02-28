@@ -84,7 +84,7 @@ function renderTextWithMentions(text: string, currentUsername?: string) {
   const parts = text.split(/(@\w+|#\[[^\]]+\])/g);
   return parts.map((part, i) => {
     if (/^@\w+$/.test(part)) {
-      const isSelf = currentUsername && part === `@${currentUsername}`;
+      const isSelf = part === '@all' || (currentUsername && part === `@${currentUsername}`);
       return (
         <span
           key={i}
@@ -386,8 +386,9 @@ const PostComments: React.FC<PostCommentsProps> = ({ postId, userRole }) => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [comments]);
 
+  const ALL_USER_ENTRY = { username: 'all', displayName: 'Tất cả mọi người' };
   const filteredUsers = mentionQuery !== null
-    ? allUsers.filter(
+    ? [ALL_USER_ENTRY, ...allUsers].filter(
         (u) =>
           u.username.toLowerCase().includes(mentionQuery) ||
           u.displayName.toLowerCase().includes(mentionQuery),
