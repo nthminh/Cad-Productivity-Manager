@@ -1,11 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, X, Save, Pencil, Trash2, User, Camera, Search } from 'lucide-react';
+import { Plus, X, Save, Pencil, Trash2, User, Camera, Search, ChevronUp, ChevronDown } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { Engineer } from '../types/database.types';
 import { useDepartments } from '../lib/useDepartments';
 
 const POSITIONS = ['Kỹ sư', 'Kỹ sư trưởng', 'Quản lý dự án', 'Giám đốc', 'Nhân viên', 'Thực tập sinh', 'Công nhân'];
+
+type EngineerSortKey = 'full_name' | 'date_of_birth' | 'position' | 'department' | 'basic_salary' | 'email' | 'phone';
+type SortDir = 'asc' | 'desc';
+
+const ENG_COLUMNS: { key: string; label: string; defaultWidth: number; sortKey?: EngineerSortKey }[] = [
+  { key: 'photo', label: 'Ảnh', defaultWidth: 72 },
+  { key: 'full_name', label: 'Họ và tên', defaultWidth: 160, sortKey: 'full_name' },
+  { key: 'date_of_birth', label: 'Ngày sinh', defaultWidth: 120, sortKey: 'date_of_birth' },
+  { key: 'position', label: 'Chức danh', defaultWidth: 130, sortKey: 'position' },
+  { key: 'department', label: 'Phòng ban', defaultWidth: 130, sortKey: 'department' },
+  { key: 'basic_salary', label: 'Lương căn bản', defaultWidth: 150, sortKey: 'basic_salary' },
+  { key: 'email', label: 'Email', defaultWidth: 180, sortKey: 'email' },
+  { key: 'phone', label: 'Điện thoại', defaultWidth: 130, sortKey: 'phone' },
+  { key: 'actions', label: 'Thao tác', defaultWidth: 100 },
+];
+type EngColKey = typeof ENG_COLUMNS[number]['key'];
+const DEFAULT_ENG_COL_WIDTHS: Record<EngColKey, number> = Object.fromEntries(
+  ENG_COLUMNS.map(c => [c.key, c.defaultWidth])
+) as Record<EngColKey, number>;
 
 interface EngineerFormProps {
   initial?: Partial<Engineer>;
@@ -218,6 +237,10 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
   const [showForm, setShowForm] = useState(false);
   const [editEngineer, setEditEngineer] = useState<Engineer | null>(null);
   const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<EngineerSortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [colWidths, setColWidths] = useState<Record<EngColKey, number>>({ ...DEFAULT_ENG_COL_WIDTHS });
+  const resizeRef = useRef<{ col: EngColKey; startX: number; startW: number } | null>(null);
 
   useEffect(() => {
     if (!db) { setLoading(false); return; }
@@ -239,6 +262,70 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
       alert('Có lỗi xảy ra khi xóa.');
     }
   };
+
+  const handleSort = (key: EngineerSortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const handleResizeMouseDown = (e: React.MouseEvent, col: EngColKey) => {
+    e.preventDefault();
+    resizeRef.current = { col, startX: e.clientX, startW: colWidths[col] };
+    const onMouseMove = (ev: MouseEvent) => {
+      const current = resizeRef.current;
+      if (!current) return;
+      const newWidth = Math.max(60, current.startW + ev.clientX - current.startX);
+      setColWidths(prev => ({ ...prev, [current.col]: newWidth }));
+    };
+    const onMouseUp = () => {
+      resizeRef.current = null;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  };
+
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? engineers.filter(eng =>
+        eng.full_name.toLowerCase().includes(q) ||
+        eng.position.toLowerCase().includes(q) ||
+        (eng.department ?? '').toLowerCase().includes(q) ||
+        (eng.email ?? '').toLowerCase().includes(q) ||
+        (eng.phone ?? '').includes(q),
+      )
+    : engineers;
+
+  const sorted = sortKey
+    ? [...filtered].sort((a, b) => {
+        let av: string | number = '';
+        let bv: string | number = '';
+        if (sortKey === 'basic_salary') {
+          av = a.basic_salary ?? 0;
+          bv = b.basic_salary ?? 0;
+        } else {
+          av = (a[sortKey] ?? '') as string;
+          bv = (b[sortKey] ?? '') as string;
+          av = av.toLowerCase();
+          bv = bv.toLowerCase();
+        }
+        if (av < bv) return sortDir === 'asc' ? -1 : 1;
+        if (av > bv) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      })
+    : filtered;
+
+  const SortIcon = ({ col }: { col: EngineerSortKey }) => (
+    <span className="inline-flex flex-col ml-1 leading-none">
+      <ChevronUp size={10} className={sortKey === col && sortDir === 'asc' ? 'text-emerald-500' : 'text-slate-300'} />
+      <ChevronDown size={10} className={sortKey === col && sortDir === 'desc' ? 'text-emerald-500' : 'text-slate-300'} />
+    </span>
+  );
 
   return (
     <div className="space-y-6">
@@ -272,46 +359,48 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
 
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-left">
+          <table className="w-full text-left border-collapse" style={{ tableLayout: 'fixed', minWidth: ENG_COLUMNS.reduce((s, c) => s + colWidths[c.key], 0) }}>
+            <colgroup>
+              {ENG_COLUMNS.map(col => (
+                <col key={col.key} style={{ width: colWidths[col.key] }} />
+              ))}
+            </colgroup>
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Ảnh</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Họ và tên</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Ngày sinh</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Chức danh</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Phòng ban</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Lương căn bản</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Email</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Điện thoại</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right whitespace-nowrap">Thao tác</th>
+              <tr className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+                {ENG_COLUMNS.map((col, idx) => (
+                  <th
+                    key={col.key}
+                    className={`px-4 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap relative select-none ${col.key === 'actions' ? 'text-right' : ''} ${col.sortKey ? 'cursor-pointer hover:bg-slate-100' : ''}`}
+                    onClick={col.sortKey ? () => handleSort(col.sortKey!) : undefined}
+                  >
+                    <span className="inline-flex items-center gap-0.5">
+                      {col.label}
+                      {col.sortKey && <SortIcon col={col.sortKey} />}
+                    </span>
+                    {idx < ENG_COLUMNS.length - 1 && (
+                      <div
+                        className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-emerald-400/60 active:bg-emerald-500/80"
+                        onClick={e => e.stopPropagation()}
+                        onMouseDown={(e) => handleResizeMouseDown(e, col.key as EngColKey)}
+                      />
+                    )}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading && (
-                <tr><td colSpan={9} className="px-6 py-10 text-center text-slate-400 text-sm">Đang tải...</td></tr>
+                <tr><td colSpan={ENG_COLUMNS.length} className="px-6 py-10 text-center text-slate-400 text-sm">Đang tải...</td></tr>
               )}
               {!loading && engineers.length === 0 && (
-                <tr><td colSpan={9} className="px-6 py-10 text-center text-slate-400 text-sm">Chưa có kỹ sư nào. Nhấn "Thêm kỹ sư" để bắt đầu.</td></tr>
+                <tr><td colSpan={ENG_COLUMNS.length} className="px-6 py-10 text-center text-slate-400 text-sm">Chưa có kỹ sư nào. Nhấn "Thêm kỹ sư" để bắt đầu.</td></tr>
               )}
-              {!loading && engineers.length > 0 && (() => {
-                const q = search.trim().toLowerCase();
-                const filtered = q
-                  ? engineers.filter((eng) =>
-                      eng.full_name.toLowerCase().includes(q) ||
-                      eng.position.toLowerCase().includes(q) ||
-                      (eng.department ?? '').toLowerCase().includes(q) ||
-                      (eng.email ?? '').toLowerCase().includes(q) ||
-                      (eng.phone ?? '').includes(q),
-                    )
-                  : engineers;
-                if (filtered.length === 0) {
-                  return (
-                    <tr><td colSpan={9} className="px-6 py-10 text-center text-slate-400 text-sm">Không tìm thấy kỹ sư phù hợp.</td></tr>
-                  );
-                }
-                return filtered.map(eng => (
+              {!loading && engineers.length > 0 && sorted.length === 0 && (
+                <tr><td colSpan={ENG_COLUMNS.length} className="px-6 py-10 text-center text-slate-400 text-sm">Không tìm thấy kỹ sư phù hợp.</td></tr>
+              )}
+              {!loading && sorted.map(eng => (
                 <tr key={eng.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-4">
                     {eng.photo_url ? (
                       <img src={eng.photo_url} alt={eng.full_name} className="w-10 h-10 rounded-full object-cover border border-slate-200" />
                     ) : (
@@ -320,19 +409,19 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
                       </div>
                     )}
                   </td>
-                  <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">{eng.full_name}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                  <td className="px-4 py-4 font-medium text-slate-900 truncate">{eng.full_name}</td>
+                  <td className="px-4 py-4 text-sm text-slate-600 truncate">
                     {eng.date_of_birth ? (() => {
                       const d = new Date(eng.date_of_birth);
                       return isNaN(d.getTime()) ? <span className="text-slate-400 italic">Không hợp lệ</span> : d.toLocaleDateString('vi-VN');
                     })() : <span className="text-slate-400 italic">Chưa có</span>}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 truncate">
                     <span className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-xs font-medium">
                       {eng.position}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 truncate">
                     {eng.department ? (
                       <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-medium">
                         {eng.department}
@@ -341,20 +430,20 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
                       <span className="text-slate-400 italic text-sm">Chưa có</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-700 whitespace-nowrap">
+                  <td className="px-4 py-4 text-sm text-slate-700 truncate">
                     {eng.basic_salary > 0 ? eng.basic_salary.toLocaleString('vi-VN') + ' ₫' : <span className="text-slate-400 italic">Chưa có</span>}
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                  <td className="px-4 py-4 text-sm text-slate-600 truncate">
                     {eng.email ? (
                       <a href={`mailto:${eng.email}`} className="text-emerald-600 hover:underline">{eng.email}</a>
                     ) : <span className="text-slate-400 italic">Chưa có</span>}
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                  <td className="px-4 py-4 text-sm text-slate-600 truncate">
                     {eng.phone ? (
                       <a href={`tel:${eng.phone}`} className="text-emerald-600 hover:underline">{eng.phone}</a>
                     ) : <span className="text-slate-400 italic">Chưa có</span>}
                   </td>
-                  <td className="px-6 py-4 text-right whitespace-nowrap">
+                  <td className="px-4 py-4 text-right">
                     {canManage && (
                       <div className="flex items-center justify-end gap-1">
                         <button
@@ -375,8 +464,7 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
                     )}
                   </td>
                 </tr>
-              ));
-            })()}
+              ))}
             </tbody>
           </table>
         </div>
