@@ -4,7 +4,6 @@ import {
   Clock, 
   FileCheck, 
   Files, 
-  Plus, 
   TrendingUp,
   AlertCircle,
   Menu
@@ -38,7 +37,7 @@ import { db, isFirebaseConfigured } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot, where, Timestamp } from 'firebase/firestore';
 import { Task } from './types/database.types';
 import { isAuthenticated, getCurrentUser } from './lib/auth';
-import { type UserRole, getPermissions, ROLE_LABELS, ROLE_BADGE_COLORS } from './lib/permissions';
+import { type UserRole, getPermissions, ROLE_LABELS } from './lib/permissions';
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(isAuthenticated());
@@ -213,21 +212,15 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             {appUser && (
-              <div className="hidden sm:flex items-center gap-2">
-                <span className="text-sm text-slate-600 font-medium hidden md:block">{appUser.displayName}</span>
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${ROLE_BADGE_COLORS[role]}`}>
-                  {ROLE_LABELS[role]}
-                </span>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                  {appUser.displayName.charAt(0).toUpperCase()}
+                </div>
+                <div className="hidden sm:block">
+                  <p className="text-sm font-medium text-slate-700 leading-tight">{appUser.displayName}</p>
+                  <p className="text-xs text-slate-500 leading-tight">{ROLE_LABELS[role]}</p>
+                </div>
               </div>
-            )}
-            {perms.canAddTask && (
-              <button 
-                onClick={() => setShowTaskForm(true)}
-                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-3 lg:px-5 py-2.5 rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
-              >
-                <Plus size={20} className="hidden sm:inline-block"/>
-                <span className="text-sm sm:text-base">Thêm Task</span>
-              </button>
             )}
           </div>
         </header>
@@ -363,6 +356,8 @@ export default function App() {
                 onViewDrawing={(url) => setViewerUrl(url)}
                 canEdit={perms.canEditTask}
                 canDelete={perms.canDeleteTask}
+                canAddTask={perms.canAddTask}
+                onAddTask={() => setShowTaskForm(true)}
               />
             </div>
           )}

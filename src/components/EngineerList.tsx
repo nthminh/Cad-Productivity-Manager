@@ -4,7 +4,7 @@ import { db } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { Engineer } from '../types/database.types';
 
-const POSITIONS = ['Kỹ sư', 'Kỹ sư trưởng', 'Quản lý dự án', 'Giám đốc', 'Nhân viên', 'Thực tập sinh'];
+const POSITIONS = ['Kỹ sư', 'Kỹ sư trưởng', 'Quản lý dự án', 'Giám đốc', 'Nhân viên', 'Thực tập sinh', 'Công nhân'];
 
 interface EngineerFormProps {
   initial?: Partial<Engineer>;
