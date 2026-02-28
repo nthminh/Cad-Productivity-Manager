@@ -150,13 +150,23 @@ export const SettingsPage: React.FC = () => {
     setPasteText('');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!config.apiKey.trim() || !config.projectId.trim()) {
       setError('API Key và Project ID là bắt buộc.');
       return;
     }
     setError(null);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    // Persist to the server so other users auto-receive the config on next load.
+    try {
+      await fetch('/api/firebase-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+    } catch {
+      // Non-fatal — local save already succeeded.
+    }
     setSaved(true);
     setTimeout(() => {
       window.location.reload();

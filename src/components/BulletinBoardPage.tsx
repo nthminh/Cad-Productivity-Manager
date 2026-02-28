@@ -77,12 +77,12 @@ function getYoutubeEmbedUrl(url: string): string | null {
 
 const HTML_TAG_RE = /(<[a-z]+[\s/>]|<\/[a-z]+>)/i;
 
-async function compressImage(file: File, maxWidth = 900, quality = 0.65): Promise<File> {
+async function compressImageToDataUrl(file: File, maxWidth = 800, quality = 0.5): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
-    const url = URL.createObjectURL(file);
+    const objectUrl = URL.createObjectURL(file);
     img.onload = () => {
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(objectUrl);
       const canvas = document.createElement('canvas');
       let { width, height } = img;
       if (width > maxWidth) {
@@ -93,28 +93,21 @@ async function compressImage(file: File, maxWidth = 900, quality = 0.65): Promis
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        resolve(file);
+        const reader = new FileReader();
+        reader.onload = (e) => resolve((e.target?.result as string) ?? '');
+        reader.readAsDataURL(file);
         return;
       }
       ctx.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            const baseName = file.name.replace(/\.[^.]+$/, '');
-            resolve(new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' }));
-          } else {
-            resolve(file);
-          }
-        },
-        'image/jpeg',
-        quality,
-      );
+      resolve(canvas.toDataURL('image/jpeg', quality));
     };
     img.onerror = () => {
-      URL.revokeObjectURL(url);
-      resolve(file);
+      URL.revokeObjectURL(objectUrl);
+      const reader = new FileReader();
+      reader.onload = (e) => resolve((e.target?.result as string) ?? '');
+      reader.readAsDataURL(file);
     };
-    img.src = url;
+    img.src = objectUrl;
   });
 }
 
@@ -485,18 +478,15 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
 
   const handleEditImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !storage) return;
+    if (!file) return;
     // Show local preview immediately so user sees the image without waiting for upload
     const localUrl = URL.createObjectURL(file);
     setEditImageLocalPreview(localUrl);
     setUploadingEditImage(true);
     setEditImageUploadError(null);
     try {
-      const compressed = await compressImage(file);
-      const fileRef = storageRef(storage, `bulletin_images/${crypto.randomUUID()}.jpg`);
-      await uploadBytes(fileRef, compressed);
-      const url = await getDownloadURL(fileRef);
-      setEditImageUrl(url);
+      const dataUrl = await compressImageToDataUrl(file);
+      setEditImageUrl(dataUrl);
       URL.revokeObjectURL(localUrl);
       setEditImageLocalPreview(null);
     } catch (err) {
@@ -808,13 +798,9 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
   }, [posts, searchQuery]);
 
   const handleImagePaste = async (file: File): Promise<string> => {
-    if (!storage) throw new Error('Storage not available');
     setUploadingImage(true);
     try {
-      const compressed = await compressImage(file);
-      const fileRef = storageRef(storage, `bulletin_images/${crypto.randomUUID()}.jpg`);
-      await uploadBytes(fileRef, compressed);
-      return await getDownloadURL(fileRef);
+      return await compressImageToDataUrl(file);
     } finally {
       setUploadingImage(false);
     }
@@ -822,18 +808,15 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
 
   const handleImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !storage) return;
+    if (!file) return;
     // Show local preview immediately so user sees the image without waiting for upload
     const localUrl = URL.createObjectURL(file);
     setImageLocalPreview(localUrl);
     setUploadingImage(true);
     setImageUploadError(null);
     try {
-      const compressed = await compressImage(file);
-      const fileRef = storageRef(storage, `bulletin_images/${crypto.randomUUID()}.jpg`);
-      await uploadBytes(fileRef, compressed);
-      const url = await getDownloadURL(fileRef);
-      setImageUrl(url);
+      const dataUrl = await compressImageToDataUrl(file);
+      setImageUrl(dataUrl);
       URL.revokeObjectURL(localUrl);
       setImageLocalPreview(null);
     } catch (err) {
@@ -970,7 +953,7 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
               onChange={setContent}
               placeholder="Nội dung bài đăng (cập nhật tin tức, thông báo...). Dán ảnh trực tiếp vào đây..."
               disabled={submitting}
-              onImagePaste={storage ? handleImagePaste : undefined}
+              onImagePaste={handleImagePaste}
             />
 
             <div className="flex items-center gap-2">
