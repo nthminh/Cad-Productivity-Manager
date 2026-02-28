@@ -496,10 +496,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                 </td>
               </tr>
             )}
-            {filteredTasks.map((task) => {
+            {filteredTasks.map((task, taskIndex) => {
               const children = childTasksMap.get(task.id) ?? [];
               const hasChildren = children.length > 0;
               const isExpanded = expandedIds.has(task.id);
+              const rowBgClass = taskIndex % 2 === 0 ? '' : 'bg-slate-50/80';
               const rollupHours = hasChildren ? children.reduce((s, c) => s + (c.actual_hours ?? 0), 0) : null;
               const rollupTargetHours = hasChildren ? children.reduce((s, c) => s + (c.target_hours ?? 0), 0) : null;
               const rollupCost = hasChildren ? children.reduce((s, c) => s + (c.cost ?? 0), 0) : null;
@@ -507,7 +508,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
               const displayTargetHours = rollupTargetHours !== null ? rollupTargetHours : task.target_hours;
               const displayCost = rollupCost !== null ? rollupCost : task.cost;
 
-              const renderTaskRow = (t: Task, isChild: boolean) => {
+              const renderTaskRow = (t: Task, isChild: boolean, bgClass: string = '') => {
                 const childList = childTasksMap.get(t.id) ?? [];
                 const childHasChildren = childList.length > 0;
                 const childIsExpanded = expandedIds.has(t.id);
@@ -519,7 +520,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                 const rowCost = childRollupCost !== null ? childRollupCost : t.cost;
 
                 return (
-                  <tr key={t.id} className={`hover:bg-slate-50/50 transition-colors group ${isChild ? 'bg-slate-50/30' : ''}`}>
+                  <tr key={t.id} className={`hover:bg-slate-50/50 transition-colors group ${bgClass}`}>
                     <td className={`py-4 overflow-hidden whitespace-nowrap ${isChild ? 'pl-10 pr-4 md:pl-14 md:pr-6' : 'px-4 md:px-6'}`}>
                       <div className="flex items-center gap-1.5">
                         {childHasChildren ? (
@@ -703,7 +704,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
               return (
                 <React.Fragment key={task.id}>
                   {/* Parent row */}
-                  <tr className={`hover:bg-slate-50/50 transition-colors group ${hasChildren ? 'border-l-2 border-l-emerald-400' : ''}`}>
+                  <tr className={`hover:bg-slate-50/50 transition-colors group ${hasChildren ? 'border-l-2 border-l-emerald-400' : ''} ${rowBgClass}`}>
                     <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         {hasChildren ? (
@@ -882,7 +883,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     </td>
                   </tr>
                   {/* Child rows (shown when expanded) */}
-                  {isExpanded && children.map(child => renderTaskRow(child, true))}
+                  {isExpanded && children.map(child => renderTaskRow(child, true, rowBgClass))}
                 </React.Fragment>
               );
             })}
