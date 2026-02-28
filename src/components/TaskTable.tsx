@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ExternalLink, Eye, MoreVertical, Star, Download, Search, Filter, FileDown, FileSpreadsheet, X, MessageSquare, ChevronRight, ChevronDown } from 'lucide-react';
+import { ExternalLink, Eye, MoreVertical, Star, Download, Search, Filter, FileDown, FileSpreadsheet, X, MessageSquare, ChevronRight, ChevronDown, Plus } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { Task } from '../types/database.types';
 import { TaskContextMenu } from './TaskContextMenu';
@@ -71,6 +71,8 @@ interface TaskTableProps {
   onViewDrawing: (link: string) => void;
   canEdit?: boolean;
   canDelete?: boolean;
+  canAddTask?: boolean;
+  onAddTask?: () => void;
 }
 
 function exportToCSV(tasks: Task[]) {
@@ -186,7 +188,7 @@ async function exportToExcel(tasks: Task[]) {
   URL.revokeObjectURL(url);
 }
 
-export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDrawing, canEdit = true, canDelete = true }) => {
+export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDrawing, canEdit = true, canDelete = true, canAddTask = false, onAddTask }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -389,6 +391,16 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
               <FileSpreadsheet size={16} />
               <span className="hidden sm:inline">Xuất Excel</span>
             </button>
+            {canAddTask && (
+              <button
+                onClick={onAddTask}
+                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-medium transition-colors shadow-sm shadow-emerald-500/20"
+                title="Thêm Task"
+              >
+                <Plus size={16} />
+                <span className="hidden sm:inline">Thêm Task</span>
+              </button>
+            )}
           </div>
         </div>
         {hasActiveFilters && (
