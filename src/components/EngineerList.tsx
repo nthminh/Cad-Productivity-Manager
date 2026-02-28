@@ -3,6 +3,7 @@ import { Plus, X, Save, Pencil, Trash2, User, Camera } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { Engineer } from '../types/database.types';
+import { useDepartments } from '../lib/useDepartments';
 
 const POSITIONS = ['Kỹ sư', 'Kỹ sư trưởng', 'Quản lý dự án', 'Giám đốc', 'Nhân viên', 'Thực tập sinh', 'Công nhân'];
 
@@ -13,10 +14,12 @@ interface EngineerFormProps {
 }
 
 const EngineerForm: React.FC<EngineerFormProps> = ({ initial, onClose, onSaved }) => {
+  const { departments } = useDepartments();
   const [form, setForm] = useState({
     full_name: initial?.full_name ?? '',
     date_of_birth: initial?.date_of_birth ?? '',
     position: initial?.position ?? 'Kỹ sư',
+    department: initial?.department ?? '',
     photo_url: initial?.photo_url ?? '',
     basic_salary: initial?.basic_salary ?? 0,
     email: initial?.email ?? '',
@@ -141,6 +144,18 @@ const EngineerForm: React.FC<EngineerFormProps> = ({ initial, onClose, onSaved }
           </div>
 
           <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase">Phòng ban</label>
+            <select
+              value={form.department}
+              onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+            >
+              <option value="">-- Chọn phòng ban --</option>
+              {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
             <input
               type="email"
@@ -251,6 +266,7 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Họ và tên</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Ngày sinh</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Chức danh</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Phòng ban</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Lương căn bản</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Email</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Điện thoại</th>
@@ -259,10 +275,10 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading && (
-                <tr><td colSpan={8} className="px-6 py-10 text-center text-slate-400 text-sm">Đang tải...</td></tr>
+                <tr><td colSpan={9} className="px-6 py-10 text-center text-slate-400 text-sm">Đang tải...</td></tr>
               )}
               {!loading && engineers.length === 0 && (
-                <tr><td colSpan={8} className="px-6 py-10 text-center text-slate-400 text-sm">Chưa có kỹ sư nào. Nhấn "Thêm kỹ sư" để bắt đầu.</td></tr>
+                <tr><td colSpan={9} className="px-6 py-10 text-center text-slate-400 text-sm">Chưa có kỹ sư nào. Nhấn "Thêm kỹ sư" để bắt đầu.</td></tr>
               )}
               {engineers.map(eng => (
                 <tr key={eng.id} className="hover:bg-slate-50/50 transition-colors">
@@ -286,6 +302,15 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
                     <span className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-xs font-medium">
                       {eng.position}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {eng.department ? (
+                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-medium">
+                        {eng.department}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic text-sm">Chưa có</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700 whitespace-nowrap">
                     {eng.basic_salary > 0 ? eng.basic_salary.toLocaleString('vi-VN') + ' ₫' : <span className="text-slate-400 italic">Chưa có</span>}
