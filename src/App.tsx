@@ -32,7 +32,7 @@ import { BulletinBoardPage } from './components/BulletinBoardPage';
 import { LoginGate } from './components/LoginGate';
 import { SettingsPage } from './components/SettingsPage';
 import { db, isFirebaseConfigured } from './lib/firebase';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { Task } from './types/database.types';
 import { isAuthenticated, getCurrentUser } from './lib/auth';
 import { type UserRole, getPermissions, ROLE_LABELS, ROLE_BADGE_COLORS } from './lib/permissions';
@@ -47,6 +47,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [mentionCount, setMentionCount] = useState(0);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !db) {
@@ -74,6 +75,20 @@ export default function App() {
 
     return () => unsubscribe();
   }, []);
+
+  // Subscribe to unacknowledged @mention notifications for the current user (for sidebar badge)
+  useEffect(() => {
+    if (!db || !appUser) return;
+    const q = query(
+      collection(db, 'mention_notifications'),
+      where('mentionedUsername', '==', appUser.username),
+      where('acknowledged', '==', false),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setMentionCount(snap.size);
+    });
+    return () => unsub();
+  }, [appUser?.username]);
 
   const fetchTasks = () => {};
 
@@ -112,7 +127,8 @@ export default function App() {
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         userRole={role}
-        onLogout={() => { setAuthenticated(false); setAppUser(null); }}
+        onLogout={() => { setAuthenticated(false); setAppUser(null); setMentionCount(0); }}
+        mentionCount={mentionCount}
       />
 
       <div className="lg:pl-64 flex-1 flex flex-col">

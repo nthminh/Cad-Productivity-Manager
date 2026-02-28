@@ -16,9 +16,10 @@ interface SidebarProps {
   setIsMobileMenuOpen: (isOpen: boolean) => void;
   userRole: UserRole;
   onLogout: () => void;
+  mentionCount?: number;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, userRole, onLogout }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, userRole, onLogout, mentionCount = 0 }) => {
   const perms = getPermissions(userRole);
 
   const allMenuItems = [
@@ -90,7 +91,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
                   activeTab === item.id ? "text-emerald-400" : "text-slate-500 group-hover:text-slate-300"
                 )} 
               />
-              {item.label}
+              <span className="flex-1 text-left">{item.label}</span>
+              {item.id === 'chat' && mentionCount > 0 && (
+                <span className="min-w-[20px] h-5 flex items-center justify-center bg-rose-500 text-white text-xs font-bold rounded-full px-1.5">
+                  {mentionCount > 99 ? '99+' : mentionCount}
+                </span>
+              )}
             </button>
           ))}
         </nav>

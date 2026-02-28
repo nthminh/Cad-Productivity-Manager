@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Send, MessageCircle, Paperclip, Image as ImageIcon, Mic, MicOff,
-  X, Reply, Edit2, Trash2, Check, Download, FileText, AtSign
+  X, Reply, Edit2, Trash2, Check, Download, FileText, AtSign, Bell, CheckCheck
 } from 'lucide-react';
 import { db, storage } from '../lib/firebase';
 import {
   collection, addDoc, query, orderBy, onSnapshot, serverTimestamp,
-  Timestamp, updateDoc, deleteDoc, doc
+  Timestamp, updateDoc, deleteDoc, doc, where, getDocs
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { getCurrentUser, getUsers } from '../lib/auth';
+import { Engineer } from '../types/database.types';
 
 interface ChatMessage {
   id: string;
@@ -27,6 +28,16 @@ interface ChatMessage {
   edited?: boolean;
   editedAt?: Timestamp | null;
   mentions?: string[];
+}
+
+interface MentionNotification {
+  id: string;
+  mentionedUsername: string;
+  mentionerName: string;
+  messageText: string;
+  messageId: string;
+  acknowledged: boolean;
+  createdAt: Timestamp | null;
 }
 
 function formatFileSize(bytes: number): string {
@@ -63,7 +74,7 @@ function renderTextWithMentions(text: string, currentUsername?: string) {
   });
 }
 
-export const ChatPage: React.FC = () => {
+export const ChatPage: React.FC<{ onMentionCountChange?: (count: number) => void }> = ({ onMentionCountChange }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -80,6 +91,9 @@ export const ChatPage: React.FC = () => {
   // @ mention
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<{ username: string; displayName: string }[]>([]);
+
+  // Mention notifications
+  const [myMentions, setMyMentions] = useState<MentionNotification[]>([]);
 
   // Voice
   const [isRecording, setIsRecording] = useState(false);
@@ -99,6 +113,31 @@ export const ChatPage: React.FC = () => {
   useEffect(() => {
     setAllUsers(getUsers().map((u) => ({ username: u.username, displayName: u.displayName })));
   }, []);
+
+  // Subscribe to unacknowledged mention notifications for the current user
+  useEffect(() => {
+    if (!db || !currentUser) return;
+    const q = query(
+      collection(db, 'mention_notifications'),
+      where('mentionedUsername', '==', currentUser.username),
+      where('acknowledged', '==', false),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const sorted = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }) as MentionNotification)
+        .sort((a, b) => {
+          const ta = a.createdAt?.toMillis() ?? 0;
+          const tb = b.createdAt?.toMillis() ?? 0;
+          return tb - ta;
+        });
+      setMyMentions(sorted);
+    });
+    return () => unsub();
+  }, [currentUser?.username]);
+
+  useEffect(() => {
+    onMentionCountChange?.(myMentions.length);
+  }, [myMentions.length, onMentionCountChange]);
 
   useEffect(() => {
     if (!db) return;
@@ -149,6 +188,71 @@ export const ChatPage: React.FC = () => {
     return matches ? matches.map((m) => m.slice(1)) : [];
   };
 
+  // Cached engineers map (fullName -> email) fetched once per session
+  const engineerEmailCacheRef = useRef<Map<string, string | null> | null>(null);
+
+  const getEngineerEmailCache = async (): Promise<Map<string, string | null>> => {
+    if (engineerEmailCacheRef.current) return engineerEmailCacheRef.current;
+    const cache = new Map<string, string | null>();
+    if (!db) return cache;
+    try {
+      const snap = await getDocs(collection(db, 'engineers'));
+      snap.docs.forEach((d) => {
+        const eng = d.data() as Engineer;
+        cache.set(eng.full_name, eng.email ?? null);
+      });
+    } catch {
+      // cache stays empty; emails simply won't be sent
+    }
+    engineerEmailCacheRef.current = cache;
+    return cache;
+  };
+
+  // Create mention notifications and send emails for all mentioned users
+  const notifyMentions = async (mentions: string[], messageId: string, messageText: string) => {
+    if (!db || !currentUser || mentions.length === 0) return;
+    const uniqueMentions = [...new Set(mentions)].filter((m) => m !== currentUser.username);
+    // Fetch engineer email cache once for all mentions in this message
+    const emailCache = await getEngineerEmailCache();
+    await Promise.all(
+      uniqueMentions.map(async (mentionedUsername) => {
+        // Create Firestore notification
+        try {
+          await addDoc(collection(db, 'mention_notifications'), {
+            mentionedUsername,
+            mentionerName: currentUser.displayName,
+            messageText,
+            messageId,
+            acknowledged: false,
+            createdAt: serverTimestamp(),
+          });
+        } catch (e) {
+          console.error('Failed to create mention notification:', e);
+        }
+        // Send email via server
+        const user = allUsers.find((u) => u.username === mentionedUsername);
+        const fullName = user?.displayName ?? mentionedUsername;
+        const email = user ? (emailCache.get(user.displayName) ?? null) : null;
+        if (email) {
+          try {
+            await fetch('/api/send-mention-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                to: email,
+                mentionedName: fullName,
+                mentionerName: currentUser.displayName,
+                messageText,
+              }),
+            });
+          } catch (e) {
+            console.error('Failed to send mention email:', e);
+          }
+        }
+      }),
+    );
+  };
+
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || !db || !currentUser) return;
@@ -169,11 +273,13 @@ export const ChatPage: React.FC = () => {
         msgData.replyToText = getReplyPreviewText(replyTo);
         msgData.replyToSender = replyTo.sender;
       }
-      await addDoc(collection(db, 'chat_messages'), msgData);
+      const msgRef = await addDoc(collection(db, 'chat_messages'), msgData);
       setInput('');
       if (inputRef.current) inputRef.current.style.height = 'auto';
       setReplyTo(null);
       setMentionQuery(null);
+      // Fire-and-forget: create notifications + send emails
+      void notifyMentions(mentions, msgRef.id, text);
     } catch (err) {
       console.error('Error sending message:', err);
       setSendError('Gửi tin nhắn thất bại. Vui lòng thử lại.');
@@ -351,6 +457,20 @@ export const ChatPage: React.FC = () => {
     }
   };
 
+  const acknowledgeMention = async (notifId: string) => {
+    if (!db) return;
+    try {
+      await updateDoc(doc(db, 'mention_notifications', notifId), { acknowledged: true });
+    } catch (err) {
+      console.error('Acknowledge error:', err);
+    }
+  };
+
+  const acknowledgeAllMentions = async () => {
+    if (!db) return;
+    await Promise.all(myMentions.map((n) => acknowledgeMention(n.id)));
+  };
+
   const formatTime = (ts: Timestamp | null) => {
     if (!ts) return '';
     const d = ts.toDate();
@@ -374,6 +494,43 @@ export const ChatPage: React.FC = () => {
           <p className="text-xs text-slate-500">Nhắn tin với các thành viên trong nhóm</p>
         </div>
       </div>
+
+      {/* Mention notifications banner */}
+      {myMentions.length > 0 && (
+        <div className="flex-shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+              <Bell size={16} className="text-amber-500" />
+              Bạn được nhắc đến ({myMentions.length})
+            </div>
+            <button
+              onClick={acknowledgeAllMentions}
+              className="flex items-center gap-1 text-xs font-medium text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg transition-colors"
+            >
+              <CheckCheck size={14} />
+              Xác nhận tất cả
+            </button>
+          </div>
+          <div className="space-y-1.5 max-h-32 overflow-y-auto">
+            {myMentions.map((n) => (
+              <div key={n.id} className="flex items-start gap-2 bg-white rounded-lg px-3 py-2 border border-amber-200">
+                <div className="flex-1 min-w-0">
+                  <span className="font-semibold text-slate-800 text-xs">{n.mentionerName}</span>
+                  <span className="text-slate-500 text-xs"> đã nhắc đến bạn: </span>
+                  <span className="text-slate-700 text-xs truncate block">{n.messageText}</span>
+                </div>
+                <button
+                  onClick={() => acknowledgeMention(n.id)}
+                  title="Xác nhận"
+                  className="p-1 text-amber-500 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors flex-shrink-0"
+                >
+                  <Check size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">

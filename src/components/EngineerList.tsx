@@ -19,6 +19,8 @@ const EngineerForm: React.FC<EngineerFormProps> = ({ initial, onClose, onSaved }
     position: initial?.position ?? 'Kỹ sư',
     photo_url: initial?.photo_url ?? '',
     basic_salary: initial?.basic_salary ?? 0,
+    email: initial?.email ?? '',
+    phone: initial?.phone ?? '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +141,28 @@ const EngineerForm: React.FC<EngineerFormProps> = ({ initial, onClose, onSaved }
           </div>
 
           <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+              placeholder="engineer@example.com"
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase">Số điện thoại</label>
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+              placeholder="0901234567"
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+            />
+          </div>
+
+          <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase">Lương căn bản (VNĐ/tháng)</label>
             <input
               type="number"
@@ -228,15 +252,17 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Ngày sinh</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Chức danh</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Lương căn bản</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Email</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Điện thoại</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right whitespace-nowrap">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading && (
-                <tr><td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-sm">Đang tải...</td></tr>
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-slate-400 text-sm">Đang tải...</td></tr>
               )}
               {!loading && engineers.length === 0 && (
-                <tr><td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-sm">Chưa có kỹ sư nào. Nhấn "Thêm kỹ sư" để bắt đầu.</td></tr>
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-slate-400 text-sm">Chưa có kỹ sư nào. Nhấn "Thêm kỹ sư" để bắt đầu.</td></tr>
               )}
               {engineers.map(eng => (
                 <tr key={eng.id} className="hover:bg-slate-50/50 transition-colors">
@@ -263,6 +289,16 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700 whitespace-nowrap">
                     {eng.basic_salary > 0 ? eng.basic_salary.toLocaleString('vi-VN') + ' ₫' : <span className="text-slate-400 italic">Chưa có</span>}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                    {eng.email ? (
+                      <a href={`mailto:${eng.email}`} className="text-emerald-600 hover:underline">{eng.email}</a>
+                    ) : <span className="text-slate-400 italic">Chưa có</span>}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                    {eng.phone ? (
+                      <a href={`tel:${eng.phone}`} className="text-emerald-600 hover:underline">{eng.phone}</a>
+                    ) : <span className="text-slate-400 italic">Chưa có</span>}
                   </td>
                   <td className="px-6 py-4 text-right whitespace-nowrap">
                     {canManage && (
