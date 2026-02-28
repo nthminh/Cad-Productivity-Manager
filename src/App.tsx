@@ -61,6 +61,8 @@ export default function App() {
   const [mentionCount, setMentionCount] = useState(0);
   const [taskMentionCount, setTaskMentionCount] = useState(0);
   const [bulletinMentionCount, setBulletinMentionCount] = useState(0);
+  const [taskMentionNotifications, setTaskMentionNotifications] = useState<{ id: string; messageId: string; sourceTitle: string; mentionerName: string }[]>([]);
+  const [bulletinMentionNotifications, setBulletinMentionNotifications] = useState<{ id: string; messageId: string; sourceTitle: string; mentionerName: string }[]>([]);
   const [newChatMessageCount, setNewChatMessageCount] = useState(0);
   const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null);
   const [lastChatVisit, setLastChatVisit] = useState<number>(() => {
@@ -123,10 +125,12 @@ export default function App() {
       where('acknowledged', '==', false),
     );
     const unsub = onSnapshot(q, (snap) => {
-      const docs = snap.docs.map((d) => d.data());
+      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as { id: string; source?: string; messageId: string; sourceTitle: string; mentionerName: string }));
       setMentionCount(docs.filter((d) => !d.source || d.source === 'chat').length);
       setTaskMentionCount(docs.filter((d) => d.source === 'task').length);
       setBulletinMentionCount(docs.filter((d) => d.source === 'bulletin').length);
+      setTaskMentionNotifications(docs.filter((d) => d.source === 'task').map(({ id, messageId, sourceTitle, mentionerName }) => ({ id, messageId, sourceTitle, mentionerName })));
+      setBulletinMentionNotifications(docs.filter((d) => d.source === 'bulletin').map(({ id, messageId, sourceTitle, mentionerName }) => ({ id, messageId, sourceTitle, mentionerName })));
     });
     return () => unsub();
   }, [appUser?.username]);
@@ -238,7 +242,7 @@ export default function App() {
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         userRole={role}
-        onLogout={() => { setAuthenticated(false); setAppUser(null); setMentionCount(0); setTaskMentionCount(0); setBulletinMentionCount(0); setUserPhotoUrl(null); }}
+        onLogout={() => { setAuthenticated(false); setAppUser(null); setMentionCount(0); setTaskMentionCount(0); setBulletinMentionCount(0); setUserPhotoUrl(null); setTaskMentionNotifications([]); setBulletinMentionNotifications([]); }}
         mentionCount={mentionCount}
         taskMentionCount={taskMentionCount}
         bulletinMentionCount={bulletinMentionCount}
@@ -326,7 +330,7 @@ export default function App() {
           ) : activeTab === 'chat' ? (
             <ChatPage />
           ) : activeTab === 'bulletin' ? (
-            <BulletinBoardPage userRole={role} mentionCount={mentionCount} bulletinMentionCount={bulletinMentionCount} newMessageCount={newChatMessageCount} onNavigateToChat={() => setActiveTab('chat')} />
+            <BulletinBoardPage userRole={role} mentionCount={mentionCount} bulletinMentionCount={bulletinMentionCount} newMessageCount={newChatMessageCount} onNavigateToChat={() => setActiveTab('chat')} bulletinMentionNotifications={bulletinMentionNotifications} />
           ) : activeTab === 'calendar' ? (
             <InternalCalendarPage />
           ) : activeTab === 'orgchart' ? (
@@ -644,6 +648,7 @@ export default function App() {
                 canDelete={perms.canDeleteTask}
                 canAddTask={perms.canAddTask}
                 onAddTask={() => setShowTaskForm(true)}
+                taskMentionNotifications={taskMentionNotifications}
               />
             </div>
           )}
