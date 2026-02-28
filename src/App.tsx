@@ -51,7 +51,7 @@ import { type UserRole, getPermissions, ROLE_LABELS } from './lib/permissions';
 export default function App() {
   const [authenticated, setAuthenticated] = useState(isAuthenticated());
   const [appUser, setAppUser] = useState(getCurrentUser());
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('tasks');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
@@ -296,9 +296,8 @@ export default function App() {
             </button>
             <div>
               <h2 className="text-xl lg:text-3xl font-bold text-slate-900 tracking-tight">
-                {activeTab === 'dashboard' ? 'Tổng quan' :
-                 activeTab === 'tasks' ? 'Quản lý dự án' :
-                 activeTab === 'engineers' ? 'Danh sách kỹ sư' :
+                {activeTab === 'tasks' ? 'Quản lý công việc' :
+                 activeTab === 'engineers' ? 'Danh sách công ty' :
                  activeTab === 'salary' ? 'Tính lương' :
                  activeTab === 'chat' ? 'Chat nội bộ' :
                  activeTab === 'bulletin' ? 'Bảng tin' :
@@ -308,12 +307,10 @@ export default function App() {
                  'Báo cáo'}
               </h2>
               <p className="text-slate-500 mt-1 text-xs lg:text-base hidden sm:block">
-                {activeTab === 'dashboard' 
-                  ? 'Theo dõi các chỉ số hiệu quả công việc.' 
-                  : activeTab === 'tasks'
-                  ? 'Danh sách chi tiết các nhiệm vụ và tiến độ.'
+                {activeTab === 'tasks'
+                  ? 'Danh sách chi tiết các công việc và tiến độ.'
                   : activeTab === 'engineers'
-                  ? 'Quản lý thông tin kỹ sư và nhân viên.'
+                  ? 'Quản lý thông tin công ty và nhân viên.'
                   : activeTab === 'salary'
                   ? 'Quản lý lương căn bản và lương theo dự án.'
                   : activeTab === 'chat'
@@ -326,7 +323,7 @@ export default function App() {
                   ? 'Cấu trúc tổ chức và nhân sự theo phòng ban.'
                   : activeTab === 'settings'
                    ? 'Quản lý người dùng và phân quyền truy cập.'
-                   : 'Thống kê và phân tích hiệu suất toàn đội.'}
+                   : 'Tổng quan và thống kê hiệu suất toàn đội.'}
               </p>
             </div>
           </div>
@@ -383,21 +380,6 @@ export default function App() {
           ) : activeTab === 'salary' && perms.canViewSalary ? (
             <SalaryPage canEditSalary={perms.canEditSalary} />
           ) : activeTab === 'reports' && perms.canViewReports ? (
-            <ReportsPage />
-          ) : activeTab === 'chat' ? (
-            <ChatPage />
-          ) : activeTab === 'bulletin' ? (
-            <BulletinBoardPage userRole={role} mentionCount={mentionCount} bulletinMentionCount={bulletinMentionCount} newMessageCount={newChatMessageCount} onNavigateToChat={() => setActiveTab('chat')} bulletinMentionNotifications={bulletinMentionNotifications} />
-          ) : activeTab === 'calendar' ? (
-            <InternalCalendarPage
-              calendarMentionNotifications={calendarMentionNotifications}
-              onAcknowledgeNotification={acknowledgeCalendarNotification}
-            />
-          ) : activeTab === 'orgchart' ? (
-            <OrgChartPage tasks={tasks} />
-          ) : activeTab === 'settings' && perms.canViewSettings ? (
-            <SettingsPage />
-          ) : activeTab === 'dashboard' ? (
             <div className="space-y-6">
               {/* Primary stat cards */}
               <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
@@ -482,210 +464,22 @@ export default function App() {
                 </div>
               )}
 
-              {/* Charts row */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Productivity bar chart */}
-                <div className="bg-white p-4 lg:p-6 rounded-2xl border border-slate-200 shadow-sm">
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-5">
-                    <BarChart3 className="text-emerald-500" size={18} />
-                    Năng suất 7 dự án gần nhất
-                  </h3>
-                  <div className="h-[260px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis 
-                          dataKey="name" 
-                          axisLine={false} 
-                          tickLine={false} 
-                          tick={{ fill: '#64748b', fontSize: 10 }}
-                          dy={10}
-                        />
-                        <YAxis 
-                          axisLine={false} 
-                          tickLine={false} 
-                          tick={{ fill: '#64748b', fontSize: 10 }}
-                          unit="%"
-                        />
-                        <Tooltip 
-                          cursor={{ fill: '#f8fafc' }}
-                          contentStyle={{ 
-                            borderRadius: '12px', 
-                            border: 'none', 
-                            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                            padding: '12px'
-                          }}
-                          formatter={(value: number) => [`${value.toFixed(1)}%`, 'Năng suất']}
-                        />
-                        <Bar dataKey="productivity" radius={[4, 4, 0, 0]} barSize={25}>
-                          {chartData.map((entry, index) => (
-                            <Cell 
-                              key={`cell-${index}`} 
-                              fill={entry.productivity > 100 ? '#10b981' : entry.productivity < 80 ? '#f43f5e' : '#3b82f6'} 
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                {/* Status distribution pie chart */}
-                <div className="bg-white p-4 lg:p-6 rounded-2xl border border-slate-200 shadow-sm">
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-5">
-                    <CheckCircle2 className="text-blue-500" size={18} />
-                    Phân bổ trạng thái dự án
-                  </h3>
-                  {statusData.length === 0 ? (
-                    <div className="h-[260px] flex items-center justify-center text-slate-400 text-sm">
-                      Chưa có dữ liệu
-                    </div>
-                  ) : (
-                    <div className="h-[260px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={statusData}
-                            cx="50%"
-                            cy="45%"
-                            innerRadius={55}
-                            outerRadius={90}
-                            paddingAngle={3}
-                            dataKey="value"
-                          >
-                            {statusData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.fill} />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '10px' }}
-                            formatter={(value: number, name: string) => [value, name]}
-                          />
-                          <Legend
-                            iconType="circle"
-                            iconSize={8}
-                            wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Engineer performance & overdue tasks */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Engineer task distribution */}
-                {engineerChartData.length > 0 && (
-                  <div className="bg-white p-4 lg:p-6 rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-5">
-                      <Users className="text-purple-500" size={18} />
-                      Phân bổ công việc theo kỹ sư
-                    </h3>
-                    <div className="h-[240px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={engineerChartData} layout="vertical">
-                          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                          <XAxis
-                            type="number"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: '#64748b', fontSize: 10 }}
-                          />
-                          <YAxis
-                            type="category"
-                            dataKey="name"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: '#64748b', fontSize: 10 }}
-                            width={80}
-                          />
-                          <Tooltip
-                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '10px' }}
-                          />
-                          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px' }} />
-                          <Bar dataKey="Hoàn_thành" name="Hoàn thành" fill="#10b981" radius={[0, 4, 4, 0]} barSize={10} />
-                          <Bar dataKey="Đang_làm" name="Đang làm" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={10} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                )}
-
-                {/* Overdue tasks list */}
-                <div className="bg-white p-4 lg:p-6 rounded-2xl border border-slate-200 shadow-sm">
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-4">
-                    <AlertCircle className="text-rose-500" size={18} />
-                    Dự án quá hạn gần nhất
-                  </h3>
-                  {overdueTasks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mb-3">
-                        <CheckCircle2 size={24} className="text-emerald-500" />
-                      </div>
-                      <p className="text-sm font-medium text-slate-700">Tuyệt vời!</p>
-                      <p className="text-xs text-slate-400 mt-1">Không có dự án nào quá hạn</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {overdueTasks.map(t => {
-                        const daysOverdue = Math.floor((now.getTime() - new Date(t.deadline!).getTime()) / 86400000);
-                        return (
-                          <div key={t.id} className="flex items-start gap-3 p-3 bg-rose-50 rounded-xl border border-rose-100">
-                            <XCircle size={16} className="text-rose-500 flex-shrink-0 mt-0.5" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-800 truncate">{t.drawing_name}</p>
-                              <p className="text-xs text-slate-500 mt-0.5">{t.engineer_name}</p>
-                            </div>
-                            <span className="text-xs font-semibold text-rose-600 whitespace-nowrap">
-                              +{daysOverdue}d
-                            </span>
-                          </div>
-                        );
-                      })}
-                      {overdueTaskCount > 5 && (
-                        <button
-                          onClick={() => setActiveTab('tasks')}
-                          className="w-full text-center text-xs text-emerald-600 hover:text-emerald-700 font-medium py-1.5 transition-colors"
-                        >
-                          Xem tất cả {overdueTaskCount} dự án quá hạn →
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Progress overview */}
-              <div className="bg-white p-4 lg:p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-4">
-                  <Award className="text-amber-500" size={18} />
-                  Tổng tiến độ dự án
-                </h3>
-                <div className="space-y-3">
-                  {[
-                    { label: 'Hoàn thành', count: completedTasks, color: 'bg-emerald-500', total: totalTasks },
-                    { label: 'Đang làm', count: inProgressTasks, color: 'bg-blue-500', total: totalTasks },
-                    { label: 'Chờ duyệt', count: pendingApprovalTasks, color: 'bg-amber-500', total: totalTasks },
-                    { label: 'Tạm hoãn', count: pausedTasks, color: 'bg-slate-400', total: totalTasks },
-                    { label: 'Đã hủy', count: cancelledTasks, color: 'bg-rose-500', total: totalTasks },
-                  ].filter(d => d.count > 0).map(({ label, count, color, total }) => (
-                    <div key={label} className="flex items-center gap-3">
-                      <span className="text-xs text-slate-500 w-24 text-right flex-shrink-0">{label}</span>
-                      <div className="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-700 ${color}`}
-                          style={{ width: total > 0 ? `${(count / total) * 100}%` : '0%' }}
-                        />
-                      </div>
-                      <span className="text-xs font-semibold text-slate-700 w-10 flex-shrink-0">
-                        {count} <span className="text-slate-400 font-normal">({total > 0 ? ((count / total) * 100).toFixed(0) : 0}%)</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              {/* Detailed reports */}
+              <ReportsPage />
             </div>
+          ) : activeTab === 'chat' ? (
+            <ChatPage />
+          ) : activeTab === 'bulletin' ? (
+            <BulletinBoardPage userRole={role} mentionCount={mentionCount} bulletinMentionCount={bulletinMentionCount} newMessageCount={newChatMessageCount} onNavigateToChat={() => setActiveTab('chat')} bulletinMentionNotifications={bulletinMentionNotifications} />
+          ) : activeTab === 'calendar' ? (
+            <InternalCalendarPage
+              calendarMentionNotifications={calendarMentionNotifications}
+              onAcknowledgeNotification={acknowledgeCalendarNotification}
+            />
+          ) : activeTab === 'orgchart' ? (
+            <OrgChartPage tasks={tasks} />
+          ) : activeTab === 'settings' && perms.canViewSettings ? (
+            <SettingsPage />
           ) : (
             <div className="space-y-6">
               <ChatNotificationBanner

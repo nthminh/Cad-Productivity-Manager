@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ClipboardList, X, Users, DollarSign, BarChart3, LogOut, MessageCircle, Newspaper, Settings, CalendarDays, Network } from 'lucide-react';
+import { ClipboardList, X, Users, DollarSign, BarChart3, LogOut, MessageCircle, Newspaper, Settings, CalendarDays, Network } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { type UserRole, getPermissions, ROLE_LABELS } from '../lib/permissions';
@@ -34,9 +34,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
   const perms = getPermissions(userRole);
 
   const allMenuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: true },
-    { id: 'tasks', label: 'Quản lý Task', icon: ClipboardList, visible: true },
-    { id: 'engineers', label: 'Danh sách kỹ sư', icon: Users, visible: perms.canViewEngineers },
+    { id: 'tasks', label: 'Quản lý công việc', icon: ClipboardList, visible: true },
+    { id: 'engineers', label: 'Danh sách công ty', icon: Users, visible: perms.canViewEngineers },
     { id: 'salary', label: 'Tính lương', icon: DollarSign, visible: perms.canViewSalary },
     { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: perms.canViewReports },
     { id: 'bulletin', label: 'Bảng tin', icon: Newspaper, visible: true },
