@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Phone, Mail, User, ZoomIn, ZoomOut, RotateCcw, CheckCircle2, Clock, Briefcase, Plus, Pencil, Trash2, Save, Settings2 } from 'lucide-react';
+import { X, Phone, Mail, User, ZoomIn, ZoomOut, RotateCcw, CheckCircle2, Clock, Briefcase, Plus, Pencil, Trash2, Save, Settings2, ChevronUp, ChevronDown } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { Engineer, Task } from '../types/database.types';
@@ -17,9 +17,10 @@ const STATUS_COLORS: Record<string, string> = {
 
 interface DeptManagerProps {
   departments: Department[];
-  onAdd: (name: string, colorKey: string) => Promise<void>;
-  onUpdate: (id: string, name: string, colorKey: string) => Promise<void>;
+  onAdd: (name: string, colorKey: string, parentId?: string) => Promise<void>;
+  onUpdate: (id: string, name: string, colorKey: string, parentId?: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onReorder: (id: string, direction: 'up' | 'down') => Promise<void>;
   onClose: () => void;
 }
 
@@ -34,24 +35,41 @@ const COLOR_LABELS: Record<string, string> = {
   orange: 'Cam',
 };
 
-const DeptManager: React.FC<DeptManagerProps> = ({ departments, onAdd, onUpdate, onDelete, onClose }) => {
+const DeptManager: React.FC<DeptManagerProps> = ({ departments, onAdd, onUpdate, onDelete, onReorder, onClose }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('blue');
+  const [editParentId, setEditParentId] = useState('');
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState('blue');
+  const [newParentId, setNewParentId] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Returns the set of IDs of the given department and all its descendants (to prevent circular refs)
+  const getDescendantIds = (id: string): Set<string> => {
+    const result = new Set<string>([id]);
+    const queue = [id];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      departments.filter((d) => d.parentId === current).forEach((child) => {
+        result.add(child.id);
+        queue.push(child.id);
+      });
+    }
+    return result;
+  };
 
   const startEdit = (dept: Department) => {
     setEditingId(dept.id);
     setEditName(dept.name);
     setEditColor(dept.colorKey);
+    setEditParentId(dept.parentId ?? '');
   };
 
   const handleSaveEdit = async () => {
     if (!editingId || !editName.trim()) return;
     setSaving(true);
-    await onUpdate(editingId, editName.trim(), editColor);
+    await onUpdate(editingId, editName.trim(), editColor, editParentId || undefined);
     setEditingId(null);
     setSaving(false);
   };
@@ -59,9 +77,10 @@ const DeptManager: React.FC<DeptManagerProps> = ({ departments, onAdd, onUpdate,
   const handleAdd = async () => {
     if (!newName.trim()) return;
     setSaving(true);
-    await onAdd(newName.trim(), newColor);
+    await onAdd(newName.trim(), newColor, newParentId || undefined);
     setNewName('');
     setNewColor('blue');
+    setNewParentId('');
     setSaving(false);
   };
 
@@ -70,9 +89,110 @@ const DeptManager: React.FC<DeptManagerProps> = ({ departments, onAdd, onUpdate,
     await onDelete(dept.id);
   };
 
+  // Build a display list: top-level depts sorted by order, then their children indented
+  const topLevel = departments.filter((d) => !d.parentId).sort((a, b) => a.order - b.order);
+  const getChildren = (parentId: string) =>
+    departments.filter((d) => d.parentId === parentId).sort((a, b) => a.order - b.order);
+
+  const renderDept = (dept: Department, isChild: boolean) => {
+    const cfg = COLOR_CONFIGS[dept.colorKey] ?? COLOR_CONFIGS['slate'];
+    const siblings = departments
+      .filter((d) => (d.parentId ?? '') === (dept.parentId ?? ''))
+      .sort((a, b) => a.order - b.order);
+    const idx = siblings.findIndex((d) => d.id === dept.id);
+
+    return (
+      <React.Fragment key={dept.id}>
+        <div className={`flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100 ${isChild ? 'ml-6' : ''}`}>
+          {editingId === dept.id ? (
+            <>
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+              />
+              <select
+                value={editColor}
+                onChange={(e) => setEditColor(e.target.value)}
+                className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none"
+              >
+                {COLOR_OPTIONS.map((c) => (
+                  <option key={c} value={c}>{COLOR_LABELS[c] ?? c}</option>
+                ))}
+              </select>
+              <select
+                value={editParentId}
+                onChange={(e) => setEditParentId(e.target.value)}
+                className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none"
+              >
+                <option value="">-- Cấp gốc --</option>
+                {departments
+                  .filter((d) => !getDescendantIds(dept.id).has(d.id))
+                  .map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+              </select>
+              <button
+                onClick={() => void handleSaveEdit()}
+                disabled={saving}
+                className="p-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+              >
+                <Save size={15} />
+              </button>
+              <button
+                onClick={() => setEditingId(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg transition-colors"
+              >
+                <X size={15} />
+              </button>
+            </>
+          ) : (
+            <>
+              <span className={`w-3 h-3 rounded-full flex-shrink-0 ${cfg.dot}`} />
+              <span className="flex-1 text-sm font-medium text-slate-800">{dept.name}</span>
+              <div className="flex flex-col gap-0.5">
+                <button
+                  onClick={() => void onReorder(dept.id, 'up')}
+                  disabled={idx === 0}
+                  className="p-0.5 text-slate-400 hover:text-slate-600 disabled:opacity-30 rounded transition-colors"
+                  title="Lên"
+                >
+                  <ChevronUp size={13} />
+                </button>
+                <button
+                  onClick={() => void onReorder(dept.id, 'down')}
+                  disabled={idx === siblings.length - 1}
+                  className="p-0.5 text-slate-400 hover:text-slate-600 disabled:opacity-30 rounded transition-colors"
+                  title="Xuống"
+                >
+                  <ChevronDown size={13} />
+                </button>
+              </div>
+              <button
+                onClick={() => startEdit(dept)}
+                className="p-1.5 text-slate-400 hover:text-emerald-500 rounded-lg transition-colors"
+                title="Chỉnh sửa"
+              >
+                <Pencil size={15} />
+              </button>
+              <button
+                onClick={() => void handleDelete(dept)}
+                className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
+                title="Xóa"
+              >
+                <Trash2 size={15} />
+              </button>
+            </>
+          )}
+        </div>
+        {getChildren(dept.id).map((child) => renderDept(child, true))}
+      </React.Fragment>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
         <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
           <div className="flex items-center gap-3">
             <div className="bg-emerald-500 p-2 rounded-lg">
@@ -85,91 +205,50 @@ const DeptManager: React.FC<DeptManagerProps> = ({ departments, onAdd, onUpdate,
           </button>
         </div>
 
-        <div className="p-5 overflow-y-auto space-y-3">
-          {departments.map((dept) => {
-            const cfg = COLOR_CONFIGS[dept.colorKey] ?? COLOR_CONFIGS['slate'];
-            return (
-              <div key={dept.id} className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                {editingId === dept.id ? (
-                  <>
-                    <input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
-                    />
-                    <select
-                      value={editColor}
-                      onChange={(e) => setEditColor(e.target.value)}
-                      className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none"
-                    >
-                      {COLOR_OPTIONS.map((c) => (
-                        <option key={c} value={c}>{COLOR_LABELS[c] ?? c}</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => void handleSaveEdit()}
-                      disabled={saving}
-                      className="p-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
-                    >
-                      <Save size={15} />
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg transition-colors"
-                    >
-                      <X size={15} />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className={`w-3 h-3 rounded-full flex-shrink-0 ${cfg.dot}`} />
-                    <span className="flex-1 text-sm font-medium text-slate-800">{dept.name}</span>
-                    <button
-                      onClick={() => startEdit(dept)}
-                      className="p-1.5 text-slate-400 hover:text-emerald-500 rounded-lg transition-colors"
-                      title="Chỉnh sửa"
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button
-                      onClick={() => void handleDelete(dept)}
-                      className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
-                      title="Xóa"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </>
-                )}
-              </div>
-            );
-          })}
+        <div className="p-5 overflow-y-auto space-y-2">
+          {topLevel.map((dept) => renderDept(dept, false))}
 
           {/* Add new department */}
-          <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-            <input
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Tên phòng ban mới..."
-              className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
-              onKeyDown={(e) => { if (e.key === 'Enter') void handleAdd(); }}
-            />
-            <select
-              value={newColor}
-              onChange={(e) => setNewColor(e.target.value)}
-              className="px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
-            >
-              {COLOR_OPTIONS.map((c) => (
-                <option key={c} value={c}>{COLOR_LABELS[c] ?? c}</option>
-              ))}
-            </select>
-            <button
-              onClick={() => void handleAdd()}
-              disabled={saving || !newName.trim()}
-              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600 disabled:bg-slate-300 transition-colors"
-            >
-              <Plus size={15} />
-              Thêm
-            </button>
+          <div className="pt-2 border-t border-slate-100 space-y-2">
+            <p className="text-xs font-bold text-slate-400 uppercase">Thêm phòng ban mới</p>
+            <div className="flex items-center gap-2">
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Tên phòng ban mới..."
+                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleAdd(); }}
+              />
+              <select
+                value={newColor}
+                onChange={(e) => setNewColor(e.target.value)}
+                className="px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+              >
+                {COLOR_OPTIONS.map((c) => (
+                  <option key={c} value={c}>{COLOR_LABELS[c] ?? c}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={newParentId}
+                onChange={(e) => setNewParentId(e.target.value)}
+                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+              >
+                <option value="">-- Phòng ban cấp gốc --</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => void handleAdd()}
+                disabled={saving || !newName.trim()}
+                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600 disabled:bg-slate-300 transition-colors"
+              >
+                <Plus size={15} />
+                Thêm
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -320,7 +399,7 @@ export const OrgChartPage: React.FC<OrgChartPageProps> = ({ tasks }) => {
   const lastMouse = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { departments, loading: deptLoading, addDepartment, updateDepartment, deleteDepartment } = useDepartments();
+  const { departments, loading: deptLoading, addDepartment, updateDepartment, deleteDepartment, reorderDepartment } = useDepartments();
 
   useEffect(() => {
     if (!db) {
@@ -370,11 +449,90 @@ export const OrgChartPage: React.FC<OrgChartPageProps> = ({ tasks }) => {
   const getDeptName = (eng: Engineer) =>
     eng.department ?? LEGACY_DEPT_MAP[eng.position] ?? 'Hành chính';
 
-  const deptOrder = departments.map((d) => d.name);
-  const grouped = deptOrder.reduce<Record<string, Engineer[]>>((acc, name) => {
-    acc[name] = engineers.filter((e) => getDeptName(e) === name);
+  const grouped = departments.reduce<Record<string, Engineer[]>>((acc, d) => {
+    acc[d.name] = engineers.filter((e) => getDeptName(e) === d.name);
     return acc;
   }, {});
+
+  const topLevelDepts = departments.filter((d) => !d.parentId).sort((a, b) => a.order - b.order);
+  const getChildDepts = (parentId: string) =>
+    departments.filter((d) => d.parentId === parentId).sort((a, b) => a.order - b.order);
+
+  const renderMembers = (members: Engineer[], cfg: (typeof COLOR_CONFIGS)[string]) => (
+    <>
+      <div className="w-0.5 bg-slate-300 h-6" />
+      <div className="relative flex items-start justify-center gap-3">
+        {members.length > 1 && (
+          <div className="absolute top-0 bg-slate-300" style={{ height: '2px', left: 40, right: 40 }} />
+        )}
+        {members.map((eng) => (
+          <div key={eng.id} className="flex flex-col items-center">
+            <div className="w-0.5 bg-slate-300 h-5" />
+            <button
+              onClick={(e) => { e.stopPropagation(); setSelectedEng(eng); }}
+              className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 bg-white cursor-pointer text-left w-[130px] ${cfg.nodeBorder}`}
+            >
+              {eng.photo_url ? (
+                <img src={eng.photo_url} alt={eng.full_name} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm flex-shrink-0" />
+              ) : (
+                <div className={`w-10 h-10 rounded-full ${cfg.nodeLight} flex items-center justify-center flex-shrink-0`}>
+                  <User size={18} className={cfg.nodeText} />
+                </div>
+              )}
+              <div className="text-center w-full">
+                <p className="text-xs font-semibold text-slate-800 leading-tight line-clamp-2">{eng.full_name}</p>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium mt-1 inline-block ${cfg.badge}`}>
+                  {eng.position}
+                </span>
+              </div>
+              {(() => {
+                const activeCount = tasks.filter(
+                  (t) => t.engineer_name === eng.full_name && t.status !== 'Hoàn thành' && t.status !== 'Đã hủy',
+                ).length;
+                return activeCount > 0 ? (
+                  <span className="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full font-bold">{activeCount} task</span>
+                ) : null;
+              })()}
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
+  const renderDeptColumn = (dept: Department) => {
+    const cfg = COLOR_CONFIGS[dept.colorKey] ?? COLOR_CONFIGS['slate'];
+    const members = grouped[dept.name] ?? [];
+    const children = getChildDepts(dept.id);
+    return (
+      <div key={dept.id} className="flex flex-col items-center" style={{ minWidth: 160 }}>
+        <div className="w-0.5 bg-slate-400 h-8" />
+        <div className={`${cfg.headerBg} text-white px-5 py-3 rounded-xl shadow-lg text-center w-full`}>
+          <p className="font-bold text-sm">{dept.name}</p>
+          <p className="text-xs opacity-75 mt-0.5">{members.length} thành viên</p>
+        </div>
+        {members.length > 0 ? renderMembers(members, cfg) : (
+          <>
+            <div className="w-0.5 bg-slate-300 h-6" />
+            <div className="border-2 border-dashed border-slate-300 rounded-xl px-4 py-3 text-center w-[130px]">
+              <p className="text-xs text-slate-400 italic">Chưa có thành viên</p>
+            </div>
+          </>
+        )}
+        {children.length > 0 && (
+          <div className="mt-4 flex flex-col items-center w-full">
+            <div className="w-0.5 bg-slate-300 h-4" />
+            <div className="relative flex items-start justify-center gap-6">
+              {children.length > 1 && (
+                <div className="absolute top-0 bg-slate-300" style={{ height: '2px', left: 40, right: 40 }} />
+              )}
+              {children.map((child) => renderDeptColumn(child))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (loading || deptLoading) {
     return (
@@ -481,106 +639,14 @@ export const OrgChartPage: React.FC<OrgChartPageProps> = ({ tasks }) => {
             {/* Vertical line down from root */}
             <div className="w-0.5 bg-slate-400 h-8" />
 
-            {/* Departments */}
+            {/* Top-level Departments */}
             <div className="relative flex items-start justify-center gap-8">
               {/* Horizontal connector line */}
               <div
                 className="absolute top-0 bg-slate-400"
                 style={{ height: '2px', left: '40px', right: '40px' }}
               />
-
-              {deptOrder.map((deptName) => {
-                const dept = departments.find((d) => d.name === deptName);
-                const cfg = dept
-                  ? (COLOR_CONFIGS[dept.colorKey] ?? COLOR_CONFIGS['slate'])
-                  : COLOR_CONFIGS['slate'];
-                const members = grouped[deptName] ?? [];
-
-                return (
-                  <div key={deptName} className="flex flex-col items-center" style={{ minWidth: 160 }}>
-                    <div className="w-0.5 bg-slate-400 h-8" />
-
-                    {/* Department node */}
-                    <div className={`${cfg.headerBg} text-white px-5 py-3 rounded-xl shadow-lg text-center w-full`}>
-                      <p className="font-bold text-sm">{deptName}</p>
-                      <p className="text-xs opacity-75 mt-0.5">{members.length} thành viên</p>
-                    </div>
-
-                    {members.length > 0 && (
-                      <>
-                        <div className="w-0.5 bg-slate-300 h-6" />
-                        <div className="relative flex items-start justify-center gap-3">
-                          {members.length > 1 && (
-                            <div
-                              className="absolute top-0 bg-slate-300"
-                              style={{ height: '2px', left: 40, right: 40 }}
-                            />
-                          )}
-                          {members.map((eng) => (
-                            <div key={eng.id} className="flex flex-col items-center">
-                              <div className="w-0.5 bg-slate-300 h-5" />
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedEng(eng);
-                                }}
-                                className={`
-                                  flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 shadow-sm
-                                  hover:shadow-md hover:-translate-y-0.5 transition-all duration-200
-                                  bg-white cursor-pointer text-left w-[130px]
-                                  ${cfg.nodeBorder}
-                                `}
-                              >
-                                {eng.photo_url ? (
-                                  <img
-                                    src={eng.photo_url}
-                                    alt={eng.full_name}
-                                    className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm flex-shrink-0"
-                                  />
-                                ) : (
-                                  <div className={`w-10 h-10 rounded-full ${cfg.nodeLight} flex items-center justify-center flex-shrink-0`}>
-                                    <User size={18} className={cfg.nodeText} />
-                                  </div>
-                                )}
-                                <div className="text-center w-full">
-                                  <p className="text-xs font-semibold text-slate-800 leading-tight line-clamp-2">
-                                    {eng.full_name}
-                                  </p>
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium mt-1 inline-block ${cfg.badge}`}>
-                                    {eng.position}
-                                  </span>
-                                </div>
-                                {(() => {
-                                  const activeCount = tasks.filter(
-                                    (t) =>
-                                      t.engineer_name === eng.full_name &&
-                                      t.status !== 'Hoàn thành' &&
-                                      t.status !== 'Đã hủy',
-                                  ).length;
-                                  return activeCount > 0 ? (
-                                    <span className="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full font-bold">
-                                      {activeCount} task
-                                    </span>
-                                  ) : null;
-                                })()}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-
-                    {members.length === 0 && (
-                      <>
-                        <div className="w-0.5 bg-slate-300 h-6" />
-                        <div className="border-2 border-dashed border-slate-300 rounded-xl px-4 py-3 text-center w-[130px]">
-                          <p className="text-xs text-slate-400 italic">Chưa có thành viên</p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
+              {topLevelDepts.map((dept) => renderDeptColumn(dept))}
             </div>
           </div>
         </div>
@@ -593,6 +659,7 @@ export const OrgChartPage: React.FC<OrgChartPageProps> = ({ tasks }) => {
           onAdd={addDepartment}
           onUpdate={updateDepartment}
           onDelete={deleteDepartment}
+          onReorder={reorderDepartment}
           onClose={() => setShowDeptManager(false)}
         />
       )}
