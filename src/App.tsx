@@ -43,7 +43,7 @@ import { SettingsPage } from './components/SettingsPage';
 import { InternalCalendarPage } from './components/InternalCalendarPage';
 import { OrgChartPage } from './components/OrgChartPage';
 import { db, isFirebaseConfigured } from './lib/firebase';
-import { collection, query, orderBy, onSnapshot, where, Timestamp, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where, Timestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { Task, Engineer } from './types/database.types';
 import { isAuthenticated, getCurrentUser } from './lib/auth';
 import { type UserRole, getPermissions, ROLE_LABELS } from './lib/permissions';
@@ -61,8 +61,10 @@ export default function App() {
   const [mentionCount, setMentionCount] = useState(0);
   const [taskMentionCount, setTaskMentionCount] = useState(0);
   const [bulletinMentionCount, setBulletinMentionCount] = useState(0);
+  const [calendarMentionCount, setCalendarMentionCount] = useState(0);
   const [taskMentionNotifications, setTaskMentionNotifications] = useState<{ id: string; messageId: string; sourceTitle: string; mentionerName: string }[]>([]);
   const [bulletinMentionNotifications, setBulletinMentionNotifications] = useState<{ id: string; messageId: string; sourceTitle: string; mentionerName: string }[]>([]);
+  const [calendarMentionNotifications, setCalendarMentionNotifications] = useState<{ id: string; messageId: string; sourceTitle: string; mentionerName: string; eventDate?: string }[]>([]);
   const [newChatMessageCount, setNewChatMessageCount] = useState(0);
   const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null);
   const [lastChatVisit, setLastChatVisit] = useState<number>(() => {
@@ -125,12 +127,24 @@ export default function App() {
       where('acknowledged', '==', false),
     );
     const unsub = onSnapshot(q, (snap) => {
-      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as { id: string; source?: string; messageId: string; sourceTitle: string; mentionerName: string }));
+      type NotifDoc = { id: string; source?: string; messageId: string; sourceTitle: string; mentionerName: string; eventDate?: string };
+      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as NotifDoc));
       setMentionCount(docs.filter((d) => !d.source || d.source === 'chat').length);
       setTaskMentionCount(docs.filter((d) => d.source === 'task').length);
       setBulletinMentionCount(docs.filter((d) => d.source === 'bulletin').length);
-      setTaskMentionNotifications(docs.filter((d) => d.source === 'task').map(({ id, messageId, sourceTitle, mentionerName }) => ({ id, messageId, sourceTitle, mentionerName })));
-      setBulletinMentionNotifications(docs.filter((d) => d.source === 'bulletin').map(({ id, messageId, sourceTitle, mentionerName }) => ({ id, messageId, sourceTitle, mentionerName })));
+      setCalendarMentionCount(docs.filter((d) => d.source === 'calendar').length);
+      setTaskMentionNotifications(
+        docs.filter((d) => d.source === 'task')
+          .map(({ id, messageId, sourceTitle, mentionerName }) => ({ id, messageId, sourceTitle, mentionerName })),
+      );
+      setBulletinMentionNotifications(
+        docs.filter((d) => d.source === 'bulletin')
+          .map(({ id, messageId, sourceTitle, mentionerName }) => ({ id, messageId, sourceTitle, mentionerName })),
+      );
+      setCalendarMentionNotifications(
+        docs.filter((d) => d.source === 'calendar')
+          .map(({ id, messageId, sourceTitle, mentionerName, eventDate }) => ({ id, messageId, sourceTitle, mentionerName, eventDate })),
+      );
     });
     return () => unsub();
   }, [appUser?.username]);
@@ -161,6 +175,15 @@ export default function App() {
   }, [appUser?.username, activeTab, lastChatVisit]);
 
   const fetchTasks = () => {};
+
+  const acknowledgeCalendarNotification = async (id: string) => {
+    if (!db) return;
+    try {
+      await updateDoc(doc(db, 'mention_notifications', id), { acknowledged: true });
+    } catch (e) {
+      console.error(`Failed to acknowledge calendar notification ${id}:`, e);
+    }
+  };
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'Hoàn thành').length;
@@ -242,10 +265,11 @@ export default function App() {
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         userRole={role}
-        onLogout={() => { setAuthenticated(false); setAppUser(null); setMentionCount(0); setTaskMentionCount(0); setBulletinMentionCount(0); setUserPhotoUrl(null); setTaskMentionNotifications([]); setBulletinMentionNotifications([]); }}
+        onLogout={() => { setAuthenticated(false); setAppUser(null); setMentionCount(0); setTaskMentionCount(0); setBulletinMentionCount(0); setCalendarMentionCount(0); setUserPhotoUrl(null); setTaskMentionNotifications([]); setBulletinMentionNotifications([]); setCalendarMentionNotifications([]); }}
         mentionCount={mentionCount}
         taskMentionCount={taskMentionCount}
         bulletinMentionCount={bulletinMentionCount}
+        calendarMentionCount={calendarMentionCount}
         appUser={sidebarUser}
       />
 
@@ -332,7 +356,10 @@ export default function App() {
           ) : activeTab === 'bulletin' ? (
             <BulletinBoardPage userRole={role} mentionCount={mentionCount} bulletinMentionCount={bulletinMentionCount} newMessageCount={newChatMessageCount} onNavigateToChat={() => setActiveTab('chat')} bulletinMentionNotifications={bulletinMentionNotifications} />
           ) : activeTab === 'calendar' ? (
-            <InternalCalendarPage />
+            <InternalCalendarPage
+              calendarMentionNotifications={calendarMentionNotifications}
+              onAcknowledgeNotification={acknowledgeCalendarNotification}
+            />
           ) : activeTab === 'orgchart' ? (
             <OrgChartPage tasks={tasks} />
           ) : activeTab === 'settings' && perms.canViewSettings ? (
