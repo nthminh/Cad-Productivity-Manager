@@ -1,4 +1,5 @@
 export type UserRole = 'admin' | 'manager' | 'engineer';
+type NonAdminRole = Exclude<UserRole, 'admin'>;
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Quản trị viên',
@@ -24,18 +25,32 @@ export interface Permissions {
   canViewSettings: boolean;
 }
 
-export const ROLE_PERMISSIONS: Record<UserRole, Permissions> = {
-  admin: {
-    canAddTask: true,
-    canEditTask: true,
-    canDeleteTask: true,
-    canViewEngineers: true,
-    canManageEngineers: true,
-    canViewSalary: true,
-    canEditSalary: true,
-    canViewReports: true,
-    canViewSettings: true,
-  },
+export const PERMISSION_LABELS: Record<keyof Permissions, string> = {
+  canAddTask: 'Thêm Task',
+  canEditTask: 'Sửa Task',
+  canDeleteTask: 'Xóa Task',
+  canViewEngineers: 'Xem danh sách kỹ sư',
+  canManageEngineers: 'Quản lý kỹ sư',
+  canViewSalary: 'Xem trang lương',
+  canEditSalary: 'Chỉnh sửa lương',
+  canViewReports: 'Xem báo cáo',
+  canViewSettings: 'Xem cài đặt',
+};
+
+/** Admin always has all permissions – these cannot be changed. */
+const ADMIN_PERMISSIONS: Permissions = {
+  canAddTask: true,
+  canEditTask: true,
+  canDeleteTask: true,
+  canViewEngineers: true,
+  canManageEngineers: true,
+  canViewSalary: true,
+  canEditSalary: true,
+  canViewReports: true,
+  canViewSettings: true,
+};
+
+const DEFAULT_ROLE_PERMISSIONS: Record<Exclude<UserRole, 'admin'>, Permissions> = {
   manager: {
     canAddTask: true,
     canEditTask: true,
@@ -60,6 +75,39 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permissions> = {
   },
 };
 
+const CUSTOM_PERMISSIONS_KEY = 'app_role_permissions';
+
+/** Returns the persisted custom permissions for non-admin roles, falling back to defaults. */
+export function getCustomRolePermissions(): Record<Exclude<UserRole, 'admin'>, Permissions> {
+  try {
+    const stored = localStorage.getItem(CUSTOM_PERMISSIONS_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as Record<string, Permissions>;
+      // Validate that both required role keys are present with all expected permission keys
+      const expectedRoles: NonAdminRole[] = ['manager', 'engineer'];
+      const expectedPerms = Object.keys(DEFAULT_ROLE_PERMISSIONS.manager) as (keyof Permissions)[];
+      const isValid = expectedRoles.every(
+        (r) =>
+          r in parsed &&
+          typeof parsed[r] === 'object' &&
+          expectedPerms.every((p) => typeof parsed[r][p] === 'boolean'),
+      );
+      if (isValid) return parsed as Record<Exclude<UserRole, 'admin'>, Permissions>;
+    }
+  } catch {
+    // ignore
+  }
+  return DEFAULT_ROLE_PERMISSIONS;
+}
+
+/** Persists custom permissions for non-admin roles. */
+export function saveCustomRolePermissions(
+  permissions: Record<Exclude<UserRole, 'admin'>, Permissions>,
+): void {
+  localStorage.setItem(CUSTOM_PERMISSIONS_KEY, JSON.stringify(permissions));
+}
+
 export function getPermissions(role: UserRole): Permissions {
-  return ROLE_PERMISSIONS[role];
+  if (role === 'admin') return ADMIN_PERMISSIONS;
+  return getCustomRolePermissions()[role];
 }
