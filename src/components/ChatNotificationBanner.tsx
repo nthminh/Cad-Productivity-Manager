@@ -6,6 +6,7 @@ interface ChatNotificationBannerProps {
   newMessageCount: number;
   onNavigateToChat: () => void;
   onDismissNewMessages?: () => void;
+  taskMentionCount?: number;
 }
 
 export const ChatNotificationBanner: React.FC<ChatNotificationBannerProps> = ({
@@ -13,8 +14,9 @@ export const ChatNotificationBanner: React.FC<ChatNotificationBannerProps> = ({
   newMessageCount,
   onNavigateToChat,
   onDismissNewMessages,
+  taskMentionCount = 0,
 }) => {
-  const total = mentionCount + newMessageCount;
+  const total = mentionCount + newMessageCount + taskMentionCount;
   if (total === 0) return null;
 
   return (
@@ -26,6 +28,12 @@ export const ChatNotificationBanner: React.FC<ChatNotificationBannerProps> = ({
         </span>
       </div>
       <div className="flex-1 min-w-0 space-y-0.5">
+        {taskMentionCount > 0 && (
+          <p className="text-sm text-emerald-800">
+            <Bell size={13} className="inline text-rose-500 mr-1 flex-shrink-0" />
+            Bạn được nhắc đến <strong>{taskMentionCount}</strong> lần trong bình luận dự án.
+          </p>
+        )}
         {mentionCount > 0 && (
           <p className="text-sm text-emerald-800">
             <Bell size={13} className="inline text-amber-500 mr-1 flex-shrink-0" />

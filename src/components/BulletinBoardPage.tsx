@@ -26,6 +26,7 @@ interface BulletinPost {
   id: string;
   author: string;
   authorUsername: string;
+  title?: string;
   content: string;
   imageUrl?: string;
   videoUrl?: string;
@@ -347,10 +348,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ onChange, placeholder, 
 
 interface PostCommentsProps {
   postId: string;
+  postTitle: string;
   userRole: UserRole;
 }
 
-const PostComments: React.FC<PostCommentsProps> = ({ postId, userRole }) => {
+const PostComments: React.FC<PostCommentsProps> = ({ postId, postTitle, userRole }) => {
   const [comments, setComments] = useState<BulletinComment[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -443,6 +445,30 @@ const PostComments: React.FC<PostCommentsProps> = ({ postId, userRole }) => {
         text,
         createdAt: serverTimestamp(),
       });
+      // Create mention notifications for mentioned users
+      const mentions = text.match(/@(\w+)/g)?.map((m) => m.slice(1)) ?? [];
+      const expandedMentions = mentions.includes('all')
+        ? [...new Set([...allUsers.map((u) => u.username), ...mentions.filter((m) => m !== 'all')])]
+        : mentions;
+      const uniqueMentions = [...new Set(expandedMentions)].filter((m) => m !== currentUser.username);
+      await Promise.all(
+        uniqueMentions.map(async (mentionedUsername) => {
+          try {
+            await addDoc(collection(db, 'mention_notifications'), {
+              mentionedUsername,
+              mentionerName: currentUser.displayName,
+              messageText: text,
+              messageId: postId,
+              acknowledged: false,
+              source: 'bulletin',
+              sourceTitle: postTitle,
+              createdAt: serverTimestamp(),
+            });
+          } catch (e) {
+            console.error('Failed to create bulletin mention notification:', e);
+          }
+        }),
+      );
       setInput('');
       setMentionQuery(null);
       setProjectMentionQuery(null);
@@ -575,12 +601,13 @@ interface PostCardProps {
   post: BulletinPost;
   userRole: UserRole;
   onDelete: (id: string) => void;
-  onEdit: (id: string, updates: { content: string; imageUrl: string; videoUrl: string }) => Promise<void>;
+  onEdit: (id: string, updates: { title: string; content: string; imageUrl: string; videoUrl: string }) => Promise<void>;
 }
 
 const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit }) => {
   const [showComments, setShowComments] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
   const [editImageUrl, setEditImageUrl] = useState('');
   const [editVideoUrl, setEditVideoUrl] = useState('');
@@ -596,6 +623,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
     post.authorUsername === currentUser?.username || userRole === 'admin';
 
   const startEdit = () => {
+    setEditTitle(post.title ?? '');
     setEditContent(post.content);
     setEditImageUrl(post.imageUrl ?? '');
     setEditVideoUrl(post.videoUrl ?? '');
@@ -617,6 +645,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
     setSaving(true);
     try {
       await onEdit(post.id, {
+        title: editTitle.trim(),
         content: editContent.trim(),
         imageUrl: editImageUrl.trim(),
         videoUrl: editVideoUrl.trim(),
@@ -709,9 +738,24 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
         </div>
       </div>
 
+      {/* Post title */}
+      {post.title && !isEditing && (
+        <div className="px-4 pb-2">
+          <h3 className="font-bold text-slate-900 text-base">{post.title}</h3>
+        </div>
+      )}
+
       {/* Post content / inline edit form */}
       {isEditing ? (
         <div className="px-4 pb-4 space-y-3">
+          <input
+            type="text"
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            placeholder="Tiêu đề bài đăng (tuỳ chọn)"
+            disabled={saving}
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm font-semibold"
+          />
           <RichTextEditor
             key={post.id}
             onChange={setEditContent}
@@ -911,7 +955,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
 
       {showComments && (
         <div className="px-4 pb-4">
-          <PostComments postId={post.id} userRole={userRole} />
+          <PostComments postId={post.id} postTitle={post.title || `Bài đăng của ${post.author}`} userRole={userRole} />
         </div>
       )}
         </>
@@ -923,14 +967,16 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
 interface BulletinBoardPageProps {
   userRole: UserRole;
   mentionCount?: number;
+  bulletinMentionCount?: number;
   newMessageCount?: number;
   onNavigateToChat?: () => void;
 }
 
-export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, mentionCount = 0, newMessageCount = 0, onNavigateToChat }) => {
+export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, mentionCount = 0, bulletinMentionCount = 0, newMessageCount = 0, onNavigateToChat }) => {
   const [posts, setPosts] = useState<BulletinPost[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
@@ -952,7 +998,8 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, 
       const textContent = p.content.replace(/<[^>]*>/g, ' ');
       return (
         textContent.toLowerCase().includes(q) ||
-        p.author.toLowerCase().includes(q)
+        p.author.toLowerCase().includes(q) ||
+        (p.title ?? '').toLowerCase().includes(q)
       );
     });
   }, [posts, searchQuery]);
@@ -1025,9 +1072,10 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, 
         pdfName = pdfFile.name;
         setUploadingPdf(false);
       }
-      await addDoc(collection(db, 'bulletin_posts'), {
+      const postRef = await addDoc(collection(db, 'bulletin_posts'), {
         author: currentUser.displayName,
         authorUsername: currentUser.username,
+        title: title.trim() || null,
         content: content.trim(),
         imageUrl: imageUrl.trim() || null,
         videoUrl: videoUrl.trim() || null,
@@ -1036,6 +1084,34 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, 
         createdAt: serverTimestamp(),
         reactions: { like: [], dislike: [], surprised: [], heart: [], laugh: [] },
       });
+      // Create mention notifications for mentions in post content (plain text extraction)
+      const plainText = content.replace(/<[^>]*>/g, ' ');
+      const allUsers = getUsers().map((u) => ({ username: u.username, displayName: u.displayName }));
+      const mentions = plainText.match(/@(\w+)/g)?.map((m) => m.slice(1)) ?? [];
+      const expandedMentions = mentions.includes('all')
+        ? [...new Set([...allUsers.map((u) => u.username), ...mentions.filter((m) => m !== 'all')])]
+        : mentions;
+      const uniqueMentions = [...new Set(expandedMentions)].filter((m) => m !== currentUser.username);
+      const postTitle = title.trim() || `Bài đăng của ${currentUser.displayName}`;
+      await Promise.all(
+        uniqueMentions.map(async (mentionedUsername) => {
+          try {
+            await addDoc(collection(db, 'mention_notifications'), {
+              mentionedUsername,
+              mentionerName: currentUser.displayName,
+              messageText: plainText.slice(0, 200),
+              messageId: postRef.id,
+              acknowledged: false,
+              source: 'bulletin',
+              sourceTitle: postTitle,
+              createdAt: serverTimestamp(),
+            });
+          } catch (e) {
+            console.error('Failed to create bulletin mention notification:', e);
+          }
+        }),
+      );
+      setTitle('');
       setContent('');
       setImageUrl('');
       setVideoUrl('');
@@ -1064,10 +1140,11 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, 
 
   const handleEditPost = async (
     postId: string,
-    updates: { content: string; imageUrl: string; videoUrl: string },
+    updates: { title: string; content: string; imageUrl: string; videoUrl: string },
   ) => {
     if (!db) return;
     await updateDoc(doc(db, 'bulletin_posts', postId), {
+      title: updates.title || null,
       content: updates.content,
       imageUrl: updates.imageUrl || null,
       videoUrl: updates.videoUrl || null,
@@ -1083,6 +1160,16 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, 
           newMessageCount={newMessageCount}
           onNavigateToChat={onNavigateToChat}
         />
+      )}
+
+      {/* Bulletin mention banner */}
+      {bulletinMentionCount > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <span className="text-amber-600 text-lg">🔔</span>
+          <p className="flex-1 text-sm text-amber-800">
+            Bạn được nhắc đến <strong>{bulletinMentionCount}</strong> lần trong bảng tin.
+          </p>
+        </div>
       )}
 
       {/* Create post button / form */}
@@ -1106,6 +1193,7 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, 
             <button
               onClick={() => {
                 setShowForm(false);
+                setTitle('');
                 setContent('');
                 setImageUrl('');
                 setVideoUrl('');
@@ -1126,6 +1214,15 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, 
             {submitError && (
               <p className="text-xs text-rose-600 font-medium">{submitError}</p>
             )}
+
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Tiêu đề bài đăng (tuỳ chọn)"
+              disabled={submitting}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm font-semibold"
+            />
 
             <RichTextEditor
               onChange={setContent}

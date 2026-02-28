@@ -59,6 +59,8 @@ export default function App() {
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [mentionCount, setMentionCount] = useState(0);
+  const [taskMentionCount, setTaskMentionCount] = useState(0);
+  const [bulletinMentionCount, setBulletinMentionCount] = useState(0);
   const [newChatMessageCount, setNewChatMessageCount] = useState(0);
   const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null);
   const [lastChatVisit, setLastChatVisit] = useState<number>(() => {
@@ -112,7 +114,7 @@ export default function App() {
     void fetchPhoto();
   }, [appUser?.displayName]);
 
-  // Subscribe to unacknowledged @mention notifications for the current user (for sidebar badge)
+  // Subscribe to unacknowledged @mention notifications for the current user (for sidebar badges)
   useEffect(() => {
     if (!db || !appUser) return;
     const q = query(
@@ -121,7 +123,10 @@ export default function App() {
       where('acknowledged', '==', false),
     );
     const unsub = onSnapshot(q, (snap) => {
-      setMentionCount(snap.size);
+      const docs = snap.docs.map((d) => d.data());
+      setMentionCount(docs.filter((d) => !d.source || d.source === 'chat').length);
+      setTaskMentionCount(docs.filter((d) => d.source === 'task').length);
+      setBulletinMentionCount(docs.filter((d) => d.source === 'bulletin').length);
     });
     return () => unsub();
   }, [appUser?.username]);
@@ -233,8 +238,10 @@ export default function App() {
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         userRole={role}
-        onLogout={() => { setAuthenticated(false); setAppUser(null); setMentionCount(0); setUserPhotoUrl(null); }}
+        onLogout={() => { setAuthenticated(false); setAppUser(null); setMentionCount(0); setTaskMentionCount(0); setBulletinMentionCount(0); setUserPhotoUrl(null); }}
         mentionCount={mentionCount}
+        taskMentionCount={taskMentionCount}
+        bulletinMentionCount={bulletinMentionCount}
         appUser={sidebarUser}
       />
 
@@ -319,7 +326,7 @@ export default function App() {
           ) : activeTab === 'chat' ? (
             <ChatPage />
           ) : activeTab === 'bulletin' ? (
-            <BulletinBoardPage userRole={role} mentionCount={mentionCount} newMessageCount={newChatMessageCount} onNavigateToChat={() => setActiveTab('chat')} />
+            <BulletinBoardPage userRole={role} mentionCount={mentionCount} bulletinMentionCount={bulletinMentionCount} newMessageCount={newChatMessageCount} onNavigateToChat={() => setActiveTab('chat')} />
           ) : activeTab === 'calendar' ? (
             <InternalCalendarPage />
           ) : activeTab === 'orgchart' ? (
@@ -619,6 +626,7 @@ export default function App() {
             <div className="space-y-6">
               <ChatNotificationBanner
                 mentionCount={mentionCount}
+                taskMentionCount={taskMentionCount}
                 newMessageCount={newChatMessageCount}
                 onNavigateToChat={() => setActiveTab('chat')}
                 onDismissNewMessages={() => {
