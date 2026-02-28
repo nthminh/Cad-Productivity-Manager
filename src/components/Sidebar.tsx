@@ -2,11 +2,18 @@ import React from 'react';
 import { LayoutDashboard, ClipboardList, X, Users, DollarSign, BarChart3, LogOut, MessageCircle, Newspaper, Settings, CalendarDays, Network } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { type UserRole, getPermissions } from '../lib/permissions';
+import { type UserRole, getPermissions, ROLE_LABELS } from '../lib/permissions';
 import { logout } from '../lib/auth';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+interface SidebarUser {
+  username: string;
+  displayName: string;
+  role: UserRole;
+  photoUrl?: string | null;
 }
 
 interface SidebarProps {
@@ -17,9 +24,10 @@ interface SidebarProps {
   userRole: UserRole;
   onLogout: () => void;
   mentionCount?: number;
+  appUser?: SidebarUser | null;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, userRole, onLogout, mentionCount = 0 }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, userRole, onLogout, mentionCount = 0, appUser }) => {
   const perms = getPermissions(userRole);
 
   const allMenuItems = [
@@ -104,6 +112,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
         </nav>
 
         <div className="p-4 border-t border-slate-800">
+          {appUser && (
+            <div className="flex items-center gap-3 px-3 py-2.5 mb-2 bg-slate-800 rounded-xl">
+              <div className="w-9 h-9 rounded-full flex-shrink-0 overflow-hidden bg-emerald-600 flex items-center justify-center">
+                {appUser.photoUrl ? (
+                  <img src={appUser.photoUrl} alt={appUser.displayName} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-white text-sm font-bold">
+                    {appUser.displayName.slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-white leading-tight truncate">{appUser.displayName}</p>
+                <p className="text-xs text-slate-400 leading-tight">{ROLE_LABELS[appUser.role]}</p>
+              </div>
+            </div>
+          )}
           <button
             onClick={() => { logout(); onLogout(); }}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-slate-400 group"

@@ -37,6 +37,7 @@ export type Engineer = {
   full_name: string;
   date_of_birth: string | null;
   position: string;
+  department: string | null;
   photo_url: string | null;
   basic_salary: number;
   email: string | null;
