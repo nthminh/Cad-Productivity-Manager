@@ -123,6 +123,14 @@ async function startServer() {
           pass: process.env.SMTP_PASS,
         },
       });
+      // Verify SMTP configuration before attempting to send
+      try {
+        await transporter.verify();
+      } catch (verifyErr) {
+        console.error("SMTP verification failed:", verifyErr);
+        res.status(503).json({ error: "SMTP configuration error: unable to connect to mail server" });
+        return;
+      }
       const safeText = escapeHtml(String(messageText ?? "").slice(0, 500));
       const safeMentioner = escapeHtml(String(mentionerName ?? "Ai đó").slice(0, 100));
       const safeMentioned = escapeHtml(String(mentionedName ?? "bạn").slice(0, 100));

@@ -29,10 +29,11 @@ import { SalaryPage } from './components/SalaryPage';
 import { ReportsPage } from './components/ReportsPage';
 import { ChatPage } from './components/ChatPage';
 import { BulletinBoardPage } from './components/BulletinBoardPage';
+import { ChatNotificationBanner } from './components/ChatNotificationBanner';
 import { LoginGate } from './components/LoginGate';
 import { SettingsPage } from './components/SettingsPage';
 import { db, isFirebaseConfigured } from './lib/firebase';
-import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where, Timestamp } from 'firebase/firestore';
 import { Task } from './types/database.types';
 import { isAuthenticated, getCurrentUser } from './lib/auth';
 import { type UserRole, getPermissions, ROLE_LABELS, ROLE_BADGE_COLORS } from './lib/permissions';
@@ -48,6 +49,11 @@ export default function App() {
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [mentionCount, setMentionCount] = useState(0);
+  const [newChatMessageCount, setNewChatMessageCount] = useState(0);
+  const [lastChatVisit, setLastChatVisit] = useState<number>(() => {
+    const stored = localStorage.getItem('lastChatVisit');
+    return stored ? parseInt(stored, 10) : Date.now();
+  });
 
   useEffect(() => {
     if (!isFirebaseConfigured || !db) {
@@ -89,6 +95,33 @@ export default function App() {
     });
     return () => unsub();
   }, [appUser?.username]);
+
+  // When user navigates to chat, mark all messages as read
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      const now = Date.now();
+      setLastChatVisit(now);
+      localStorage.setItem('lastChatVisit', String(now));
+      setNewChatMessageCount(0);
+    }
+  }, [activeTab]);
+
+  // Subscribe to new chat messages from others since last chat visit (for cross-page banner).
+  // Client-side username filtering is used because Firestore does not allow combining
+  // inequality operators on two different fields without a composite index.
+  useEffect(() => {
+    if (!db || !appUser || activeTab === 'chat') return;
+    const q = query(
+      collection(db, 'chat_messages'),
+      where('createdAt', '>', Timestamp.fromMillis(lastChatVisit)),
+      orderBy('createdAt', 'desc'),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const count = snap.docs.filter((d) => d.data().username !== appUser.username).length;
+      setNewChatMessageCount(count);
+    });
+    return () => unsub();
+  }, [appUser?.username, activeTab, lastChatVisit]);
 
   const fetchTasks = () => {};
 
@@ -208,7 +241,7 @@ export default function App() {
           ) : activeTab === 'chat' ? (
             <ChatPage />
           ) : activeTab === 'bulletin' ? (
-            <BulletinBoardPage userRole={role} />
+            <BulletinBoardPage userRole={role} mentionCount={mentionCount} newMessageCount={newChatMessageCount} onNavigateToChat={() => setActiveTab('chat')} />
           ) : activeTab === 'settings' && perms.canViewSettings ? (
             <SettingsPage />
           ) : activeTab === 'dashboard' ? (
@@ -301,6 +334,17 @@ export default function App() {
             </div>
           ) : (
             <div className="space-y-6">
+              <ChatNotificationBanner
+                mentionCount={mentionCount}
+                newMessageCount={newChatMessageCount}
+                onNavigateToChat={() => setActiveTab('chat')}
+                onDismissNewMessages={() => {
+                  const now = Date.now();
+                  setLastChatVisit(now);
+                  localStorage.setItem('lastChatVisit', String(now));
+                  setNewChatMessageCount(0);
+                }}
+              />
               <TaskTable 
                 tasks={tasks} 
                 onRefresh={fetchTasks} 
