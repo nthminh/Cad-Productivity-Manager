@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Send, Trash2, Pencil, MessageSquare, Image as ImageIcon, Video, X, ChevronDown, ChevronUp, Newspaper, Bold, Italic, Underline, FileText, Upload, Search, AtSign, Hash } from 'lucide-react';
+import { Plus, Send, Trash2, Pencil, MessageSquare, Image as ImageIcon, Video, X, ChevronDown, ChevronUp, Newspaper, Bold, Italic, Underline, FileText, Upload, Search, AtSign, Hash, Bell, CheckCircle2 } from 'lucide-react';
 import { db, storage } from '../lib/firebase';
 import {
   collection,
@@ -602,10 +602,11 @@ interface PostCardProps {
   userRole: UserRole;
   onDelete: (id: string) => void;
   onEdit: (id: string, updates: { title: string; content: string; imageUrl: string; videoUrl: string }) => Promise<void>;
+  openComments?: boolean;
 }
 
-const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit }) => {
-  const [showComments, setShowComments] = useState(false);
+const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit, openComments = false }) => {
+  const [showComments, setShowComments] = useState(openComments);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
@@ -621,6 +622,10 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
     post.authorUsername === currentUser?.username || userRole === 'admin';
   const canEdit =
     post.authorUsername === currentUser?.username || userRole === 'admin';
+
+  useEffect(() => {
+    if (openComments) setShowComments(true);
+  }, [openComments]);
 
   const startEdit = () => {
     setEditTitle(post.title ?? '');
@@ -704,7 +709,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
   const embedUrl = post.videoUrl ? getYoutubeEmbedUrl(post.videoUrl) : null;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div id={post.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       {/* Post header */}
       <div className="flex items-start justify-between p-4 pb-3">
         <div className="flex items-center gap-3">
@@ -964,17 +969,26 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
   );
 };
 
+interface BulletinMentionNotification {
+  id: string;
+  messageId: string;
+  sourceTitle: string;
+  mentionerName: string;
+}
+
 interface BulletinBoardPageProps {
   userRole: UserRole;
   mentionCount?: number;
   bulletinMentionCount?: number;
   newMessageCount?: number;
   onNavigateToChat?: () => void;
+  bulletinMentionNotifications?: BulletinMentionNotification[];
 }
 
-export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, mentionCount = 0, bulletinMentionCount = 0, newMessageCount = 0, onNavigateToChat }) => {
+export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, mentionCount = 0, bulletinMentionCount = 0, newMessageCount = 0, onNavigateToChat, bulletinMentionNotifications = [] }) => {
   const [posts, setPosts] = useState<BulletinPost[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [openCommentsPostId, setOpenCommentsPostId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -1054,6 +1068,24 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, 
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    if (!openCommentsPostId) return;
+    const timer = setTimeout(() => {
+      const el = document.getElementById(openCommentsPostId);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [openCommentsPostId]);
+
+  const acknowledgeBulletinNotification = async (id: string) => {
+    if (!db) return;
+    try {
+      await updateDoc(doc(db, 'mention_notifications', id), { acknowledged: true });
+    } catch (e) {
+      console.error(`Failed to acknowledge notification ${id}:`, e);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1162,13 +1194,39 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, 
         />
       )}
 
-      {/* Bulletin mention banner */}
-      {bulletinMentionCount > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-          <span className="text-amber-600 text-lg">🔔</span>
-          <p className="flex-1 text-sm text-amber-800">
-            Bạn được nhắc đến <strong>{bulletinMentionCount}</strong> lần trong bảng tin.
-          </p>
+      {/* Bulletin mention notifications */}
+      {bulletinMentionNotifications.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
+          <div className="flex items-center gap-2 mb-1">
+            <Bell size={16} className="text-amber-600 flex-shrink-0" />
+            <p className="text-sm font-semibold text-amber-800">Bạn được nhắc đến trong bảng tin:</p>
+          </div>
+          {bulletinMentionNotifications.map((notif) => (
+            <div key={notif.id} className="flex items-center gap-2 bg-white border border-amber-100 rounded-xl px-3 py-2">
+              <MessageSquare size={14} className="text-amber-500 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="text-sm text-slate-800 font-medium truncate">{notif.sourceTitle}</span>
+                <span className="text-xs text-slate-500 ml-1.5">bởi {notif.mentionerName}</span>
+              </div>
+              <button
+                onClick={() => {
+                  setOpenCommentsPostId(notif.messageId);
+                  acknowledgeBulletinNotification(notif.id);
+                }}
+                className="flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition-colors flex-shrink-0"
+              >
+                <MessageSquare size={12} />
+                Xem
+              </button>
+              <button
+                onClick={() => acknowledgeBulletinNotification(notif.id)}
+                title="Đánh dấu đã đọc"
+                className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors flex-shrink-0"
+              >
+                <CheckCircle2 size={16} />
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
@@ -1407,6 +1465,7 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, 
           userRole={userRole}
           onDelete={handleDeletePost}
           onEdit={handleEditPost}
+          openComments={post.id === openCommentsPostId}
         />
       ))}
     </div>

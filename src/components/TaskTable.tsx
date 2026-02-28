@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ExternalLink, Eye, MoreVertical, Star, Download, Search, Filter, FileDown, FileSpreadsheet, X, MessageSquare, ChevronRight, ChevronDown, Plus } from 'lucide-react';
+import { ExternalLink, Eye, MoreVertical, Star, Download, Search, Filter, FileDown, FileSpreadsheet, X, MessageSquare, ChevronRight, ChevronDown, Plus, Bell, CheckCircle2 } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { Task } from '../types/database.types';
 import { TaskContextMenu } from './TaskContextMenu';
@@ -65,6 +65,13 @@ function ActualHoursInput({ task, onRefresh, readOnly }: { task: Task; onRefresh
   );
 }
 
+interface TaskMentionNotification {
+  id: string;
+  messageId: string;
+  sourceTitle: string;
+  mentionerName: string;
+}
+
 interface TaskTableProps {
   tasks: Task[];
   onRefresh: () => void;
@@ -73,6 +80,7 @@ interface TaskTableProps {
   canDelete?: boolean;
   canAddTask?: boolean;
   onAddTask?: () => void;
+  taskMentionNotifications?: TaskMentionNotification[];
 }
 
 function exportToCSV(tasks: Task[]) {
@@ -188,7 +196,7 @@ async function exportToExcel(tasks: Task[]) {
   URL.revokeObjectURL(url);
 }
 
-export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDrawing, canEdit = true, canDelete = true, canAddTask = false, onAddTask }) => {
+export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDrawing, canEdit = true, canDelete = true, canAddTask = false, onAddTask, taskMentionNotifications = [] }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -325,8 +333,52 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
     return 'text-slate-700';
   };
 
+  const acknowledgeTaskNotification = async (id: string) => {
+    if (!db) return;
+    try {
+      await updateDoc(doc(db, 'mention_notifications', id), { acknowledged: true });
+    } catch (e) {
+      console.error(`Failed to acknowledge notification ${id}:`, e);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {/* Task mention notifications */}
+      {taskMentionNotifications.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
+          <div className="flex items-center gap-2 mb-1">
+            <Bell size={16} className="text-amber-600 flex-shrink-0" />
+            <p className="text-sm font-semibold text-amber-800">Bạn được nhắc đến trong bình luận dự án:</p>
+          </div>
+          {taskMentionNotifications.map((notif) => (
+            <div key={notif.id} className="flex items-center gap-2 bg-white border border-amber-100 rounded-xl px-3 py-2">
+              <MessageSquare size={14} className="text-amber-500 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="text-sm text-slate-800 font-medium truncate">{notif.sourceTitle}</span>
+                <span className="text-xs text-slate-500 ml-1.5">bởi {notif.mentionerName}</span>
+              </div>
+              <button
+                onClick={() => {
+                  setCommentTaskId(notif.messageId);
+                  acknowledgeTaskNotification(notif.id);
+                }}
+                className="flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition-colors flex-shrink-0"
+              >
+                <MessageSquare size={12} />
+                Xem
+              </button>
+              <button
+                onClick={() => acknowledgeTaskNotification(notif.id)}
+                title="Đánh dấu đã đọc"
+                className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors flex-shrink-0"
+              >
+                <CheckCircle2 size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {/* Filter Bar */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
