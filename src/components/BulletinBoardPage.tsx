@@ -18,6 +18,7 @@ import {
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getCurrentUser } from '../lib/auth';
 import type { UserRole } from '../lib/permissions';
+import { ChatNotificationBanner } from './ChatNotificationBanner';
 
 interface BulletinPost {
   id: string;
@@ -800,9 +801,12 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
 
 interface BulletinBoardPageProps {
   userRole: UserRole;
+  mentionCount?: number;
+  newMessageCount?: number;
+  onNavigateToChat?: () => void;
 }
 
-export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }) => {
+export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole, mentionCount = 0, newMessageCount = 0, onNavigateToChat }) => {
   const [posts, setPosts] = useState<BulletinPost[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -951,6 +955,15 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
+      {/* Chat notification banner */}
+      {onNavigateToChat && (
+        <ChatNotificationBanner
+          mentionCount={mentionCount}
+          newMessageCount={newMessageCount}
+          onNavigateToChat={onNavigateToChat}
+        />
+      )}
+
       {/* Create post button / form */}
       {currentUser && !showForm && (
         <button
