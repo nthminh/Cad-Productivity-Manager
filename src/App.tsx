@@ -43,7 +43,7 @@ import { SettingsPage } from './components/SettingsPage';
 import { InternalCalendarPage } from './components/InternalCalendarPage';
 import { OrgChartPage } from './components/OrgChartPage';
 import { db, isFirebaseConfigured } from './lib/firebase';
-import { collection, query, orderBy, onSnapshot, where, Timestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where, Timestamp, doc, updateDoc } from 'firebase/firestore';
 import { Task, Engineer } from './types/database.types';
 import { isAuthenticated, getCurrentUser, logout } from './lib/auth';
 import { type UserRole, getPermissions, ROLE_LABELS } from './lib/permissions';
@@ -100,23 +100,19 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch user's engineer profile photo
+  // Subscribe to user's engineer profile photo in real-time
   useEffect(() => {
     if (!db || !appUser) return;
-    const fetchPhoto = async () => {
-      try {
-        const snap = await getDocs(
-          query(collection(db, 'engineers'), where('full_name', '==', appUser.displayName))
-        );
-        if (!snap.empty) {
-          const photoUrl = snap.docs[0].data().photo_url as string | null;
-          setUserPhotoUrl(photoUrl ?? null);
-        }
-      } catch {
-        // ignore
+    const q = query(collection(db, 'engineers'), where('full_name', '==', appUser.displayName));
+    const unsub = onSnapshot(q, (snap) => {
+      if (!snap.empty) {
+        const photoUrl = snap.docs[0].data().photo_url as string | null;
+        setUserPhotoUrl(photoUrl ?? null);
+      } else {
+        setUserPhotoUrl(null);
       }
-    };
-    void fetchPhoto();
+    }, () => { /* ignore errors */ });
+    return () => unsub();
   }, [appUser?.displayName]);
 
   // Subscribe to unacknowledged @mention notifications for the current user (for sidebar badges)
