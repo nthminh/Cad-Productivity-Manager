@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Send, Trash2, Pencil, MessageSquare, Image as ImageIcon, Video, X, ChevronDown, ChevronUp, Newspaper, Bold, Italic, Underline, FileText, Upload, Search } from 'lucide-react';
+import { Plus, Send, Trash2, Pencil, MessageSquare, Image as ImageIcon, Video, X, ChevronDown, ChevronUp, Newspaper, Bold, Italic, Underline, FileText, Upload, Search, AtSign, Hash } from 'lucide-react';
 import { db, storage } from '../lib/firebase';
 import {
   collection,
@@ -17,8 +17,10 @@ import {
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getCurrentUser } from '../lib/auth';
+import { getUsers } from '../lib/auth';
 import type { UserRole } from '../lib/permissions';
 import { ChatNotificationBanner } from './ChatNotificationBanner';
+import { useProjectNames } from '../lib/useProjectNames';
 
 interface BulletinPost {
   id: string;
@@ -77,6 +79,31 @@ function getYoutubeEmbedUrl(url: string): string | null {
 }
 
 const HTML_TAG_RE = /(<[a-z]+[\s/>]|<\/[a-z]+>)/i;
+
+function renderTextWithMentions(text: string, currentUsername?: string) {
+  const parts = text.split(/(@\w+|#\[[^\]]+\])/g);
+  return parts.map((part, i) => {
+    if (/^@\w+$/.test(part)) {
+      const isSelf = currentUsername && part === `@${currentUsername}`;
+      return (
+        <span
+          key={i}
+          className={`font-semibold ${isSelf ? 'bg-yellow-200 text-yellow-800 rounded px-0.5' : 'text-emerald-600'}`}
+        >
+          {part}
+        </span>
+      );
+    }
+    if (/^#\[.+\]$/.test(part)) {
+      return (
+        <span key={i} className="font-semibold text-blue-500">
+          {part}
+        </span>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
 
 async function compressImageToDataUrl(file: File, maxWidth = 800, quality = 0.5): Promise<string> {
   return new Promise((resolve) => {
@@ -327,8 +354,17 @@ const PostComments: React.FC<PostCommentsProps> = ({ postId, userRole }) => {
   const [comments, setComments] = useState<BulletinComment[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [projectMentionQuery, setProjectMentionQuery] = useState<string | null>(null);
+  const [allUsers, setAllUsers] = useState<{ username: string; displayName: string }[]>([]);
+  const projectNames = useProjectNames();
   const currentUser = getCurrentUser();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setAllUsers(getUsers().map((u) => ({ username: u.username, displayName: u.displayName })));
+  }, []);
 
   useEffect(() => {
     if (!db) return;
@@ -350,6 +386,50 @@ const PostComments: React.FC<PostCommentsProps> = ({ postId, userRole }) => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [comments]);
 
+  const filteredUsers = mentionQuery !== null
+    ? allUsers.filter(
+        (u) =>
+          u.username.toLowerCase().includes(mentionQuery) ||
+          u.displayName.toLowerCase().includes(mentionQuery),
+      )
+    : [];
+
+  const filteredProjects = projectMentionQuery !== null
+    ? projectNames.filter((p) => p.toLowerCase().includes(projectMentionQuery)).slice(0, 6)
+    : [];
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInput(val);
+    const mentionMatch = val.match(/@(\w*)$/);
+    if (mentionMatch) {
+      setMentionQuery(mentionMatch[1].toLowerCase());
+      setProjectMentionQuery(null);
+    } else {
+      setMentionQuery(null);
+      const projMatch = val.match(/#([^#\n]*)$/);
+      if (projMatch) {
+        setProjectMentionQuery(projMatch[1].toLowerCase());
+      } else {
+        setProjectMentionQuery(null);
+      }
+    }
+  };
+
+  const insertMention = (username: string) => {
+    const newInput = input.replace(/@(\w*)$/, `@${username} `);
+    setInput(newInput);
+    setMentionQuery(null);
+    inputRef.current?.focus();
+  };
+
+  const insertProjectMention = (projectName: string) => {
+    const newInput = input.replace(/#([^#\n]*)$/, `#[${projectName}] `);
+    setInput(newInput);
+    setProjectMentionQuery(null);
+    inputRef.current?.focus();
+  };
+
   const sendComment = async () => {
     const text = input.trim();
     if (!text || !db || !currentUser) return;
@@ -363,6 +443,8 @@ const PostComments: React.FC<PostCommentsProps> = ({ postId, userRole }) => {
         createdAt: serverTimestamp(),
       });
       setInput('');
+      setMentionQuery(null);
+      setProjectMentionQuery(null);
     } catch (err) {
       console.error('Error sending comment:', err);
     } finally {
@@ -413,7 +495,7 @@ const PostComments: React.FC<PostCommentsProps> = ({ postId, userRole }) => {
                     </button>
                   )}
                 </div>
-                <p className="text-sm text-slate-700 break-words">{c.text}</p>
+                <p className="text-sm text-slate-700 break-words">{renderTextWithMentions(c.text, currentUser?.username)}</p>
               </div>
             </div>
           );
@@ -422,28 +504,66 @@ const PostComments: React.FC<PostCommentsProps> = ({ postId, userRole }) => {
       </div>
 
       {currentUser && (
-        <div className="flex gap-2 items-center">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendComment();
-              }
-            }}
-            placeholder="Viết bình luận..."
-            disabled={!db || sending}
-            className="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm"
-          />
-          <button
-            onClick={sendComment}
-            disabled={sending || !input.trim() || !db}
-            className="flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 text-white p-2 rounded-xl transition-all active:scale-95 flex-shrink-0"
-          >
-            <Send size={16} />
-          </button>
+        <div className="space-y-1.5">
+          {/* @ mention dropdown */}
+          {mentionQuery !== null && filteredUsers.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+              {filteredUsers.slice(0, 6).map((u) => (
+                <button
+                  key={u.username}
+                  onClick={() => insertMention(u.username)}
+                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-emerald-50 text-left text-sm"
+                >
+                  <AtSign size={14} className="text-emerald-500 flex-shrink-0" />
+                  <span className="font-medium text-slate-800">{u.displayName}</span>
+                  <span className="text-slate-400 text-xs">@{u.username}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {/* # project mention dropdown */}
+          {projectMentionQuery !== null && filteredProjects.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+              {filteredProjects.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => insertProjectMention(p)}
+                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-blue-50 text-left text-sm"
+                >
+                  <Hash size={14} className="text-blue-500 flex-shrink-0" />
+                  <span className="font-medium text-slate-800">{p}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2 items-center">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendComment();
+                }
+                if (e.key === 'Escape') {
+                  setMentionQuery(null);
+                  setProjectMentionQuery(null);
+                }
+              }}
+              placeholder="Viết bình luận... (@ nhắc ai đó, # nhắc đề án)"
+              disabled={!db || sending}
+              className="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm"
+            />
+            <button
+              onClick={sendComment}
+              disabled={sending || !input.trim() || !db}
+              className="flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 text-white p-2 rounded-xl transition-all active:scale-95 flex-shrink-0"
+            >
+              <Send size={16} />
+            </button>
+          </div>
         </div>
       )}
     </div>

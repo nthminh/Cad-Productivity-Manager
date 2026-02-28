@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Trash2, MessageSquare, AtSign } from 'lucide-react';
+import { X, Send, Trash2, MessageSquare, AtSign, Hash } from 'lucide-react';
 import { db } from '../lib/firebase';
 import {
   collection,
@@ -14,6 +14,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { getCurrentUser, getUsers } from '../lib/auth';
+import { useProjectNames } from '../lib/useProjectNames';
 
 interface TaskComment {
   id: string;
@@ -26,7 +27,7 @@ interface TaskComment {
 }
 
 function renderTextWithMentions(text: string, currentUsername?: string) {
-  const parts = text.split(/(@\w+)/g);
+  const parts = text.split(/(@\w+|#\[[^\]]+\])/g);
   return parts.map((part, i) => {
     if (/^@\w+$/.test(part)) {
       const isSelf = currentUsername && part === `@${currentUsername}`;
@@ -35,6 +36,13 @@ function renderTextWithMentions(text: string, currentUsername?: string) {
           key={i}
           className={`font-semibold ${isSelf ? 'bg-yellow-200 text-yellow-800 rounded px-0.5' : 'text-emerald-600'}`}
         >
+          {part}
+        </span>
+      );
+    }
+    if (/^#\[.+\]$/.test(part)) {
+      return (
+        <span key={i} className="font-semibold text-blue-500">
           {part}
         </span>
       );
@@ -61,6 +69,8 @@ export const TaskCommentSection: React.FC<Props> = ({ taskId, taskName, onClose 
   const [sendError, setSendError] = useState<string | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<{ username: string; displayName: string }[]>([]);
+  const [projectMentionQuery, setProjectMentionQuery] = useState<string | null>(null);
+  const projectNames = useProjectNames();
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -96,17 +106,28 @@ export const TaskCommentSection: React.FC<Props> = ({ taskId, taskName, onClose 
         )
       : [];
 
+  const filteredProjects = projectMentionQuery !== null
+    ? projectNames.filter((p) => p.toLowerCase().includes(projectMentionQuery)).slice(0, 6)
+    : [];
+
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInput(val);
     const el = e.target;
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
-    const match = val.match(/@(\w*)$/);
-    if (match) {
-      setMentionQuery(match[1].toLowerCase());
+    const mentionMatch = val.match(/@(\w*)$/);
+    if (mentionMatch) {
+      setMentionQuery(mentionMatch[1].toLowerCase());
+      setProjectMentionQuery(null);
     } else {
       setMentionQuery(null);
+      const projMatch = val.match(/#([^#\n]*)$/);
+      if (projMatch) {
+        setProjectMentionQuery(projMatch[1].toLowerCase());
+      } else {
+        setProjectMentionQuery(null);
+      }
     }
   };
 
@@ -114,6 +135,13 @@ export const TaskCommentSection: React.FC<Props> = ({ taskId, taskName, onClose 
     const newInput = input.replace(/@(\w*)$/, `@${username} `);
     setInput(newInput);
     setMentionQuery(null);
+    inputRef.current?.focus();
+  };
+
+  const insertProjectMention = (projectName: string) => {
+    const newInput = input.replace(/#([^#\n]*)$/, `#[${projectName}] `);
+    setInput(newInput);
+    setProjectMentionQuery(null);
     inputRef.current?.focus();
   };
 
@@ -134,6 +162,7 @@ export const TaskCommentSection: React.FC<Props> = ({ taskId, taskName, onClose 
       setInput('');
       if (inputRef.current) inputRef.current.style.height = 'auto';
       setMentionQuery(null);
+      setProjectMentionQuery(null);
     } catch (err) {
       console.error('Error sending comment:', err);
       setSendError('Gửi bình luận thất bại. Vui lòng thử lại.');
@@ -260,6 +289,22 @@ export const TaskCommentSection: React.FC<Props> = ({ taskId, taskName, onClose 
             </div>
           )}
 
+          {/* # project mention dropdown */}
+          {projectMentionQuery !== null && filteredProjects.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+              {filteredProjects.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => insertProjectMention(p)}
+                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-blue-50 text-left text-sm"
+                >
+                  <Hash size={14} className="text-blue-500 flex-shrink-0" />
+                  <span className="font-medium text-slate-800">{p}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {sendError && <p className="text-xs text-rose-600 font-medium">{sendError}</p>}
 
           <div className="flex gap-2 items-end">
@@ -274,9 +319,10 @@ export const TaskCommentSection: React.FC<Props> = ({ taskId, taskName, onClose 
                 }
                 if (e.key === 'Escape') {
                   setMentionQuery(null);
+                  setProjectMentionQuery(null);
                 }
               }}
-              placeholder="Viết bình luận... (dùng @ để nhắc ai đó)"
+              placeholder="Viết bình luận... (dùng @ để nhắc ai đó, # để nhắc đề án)"
               disabled={!db || !currentUser || sending}
               rows={1}
               className="flex-1 min-w-0 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm resize-none overflow-hidden"

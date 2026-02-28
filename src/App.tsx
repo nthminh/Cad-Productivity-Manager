@@ -32,6 +32,7 @@ import { BulletinBoardPage } from './components/BulletinBoardPage';
 import { ChatNotificationBanner } from './components/ChatNotificationBanner';
 import { LoginGate } from './components/LoginGate';
 import { SettingsPage } from './components/SettingsPage';
+import { InternalCalendarPage } from './components/InternalCalendarPage';
 import { db, isFirebaseConfigured } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot, where, Timestamp } from 'firebase/firestore';
 import { Task } from './types/database.types';
@@ -181,6 +182,7 @@ export default function App() {
                  activeTab === 'salary' ? 'Tính lương' :
                  activeTab === 'chat' ? 'Chat nội bộ' :
                  activeTab === 'bulletin' ? 'Bảng tin' :
+                 activeTab === 'calendar' ? 'Lịch nội bộ' :
                  activeTab === 'settings' ? 'Cài đặt' :
                  'Báo cáo'}
               </h2>
@@ -197,6 +199,8 @@ export default function App() {
                   ? 'Nhắn tin và trao đổi với các thành viên trong nhóm.'
                   : activeTab === 'bulletin'
                   ? 'Cập nhật tin tức và thông báo của công ty.'
+                  : activeTab === 'calendar'
+                  ? 'Lịch nội bộ và các sự kiện quan trọng của đội.'
                   : activeTab === 'settings'
                    ? 'Quản lý người dùng và phân quyền truy cập.'
                    : 'Thống kê và phân tích hiệu suất toàn đội.'}
@@ -242,6 +246,8 @@ export default function App() {
             <ChatPage />
           ) : activeTab === 'bulletin' ? (
             <BulletinBoardPage userRole={role} mentionCount={mentionCount} newMessageCount={newChatMessageCount} onNavigateToChat={() => setActiveTab('chat')} />
+          ) : activeTab === 'calendar' ? (
+            <InternalCalendarPage />
           ) : activeTab === 'settings' && perms.canViewSettings ? (
             <SettingsPage />
           ) : activeTab === 'dashboard' ? (
