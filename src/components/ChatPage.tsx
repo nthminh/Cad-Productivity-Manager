@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Send, MessageCircle, Paperclip, Image as ImageIcon, Mic, MicOff,
-  X, Reply, Edit2, Trash2, Check, Download, FileText, AtSign, Bell, CheckCheck
+  X, Reply, Edit2, Trash2, Check, Download, FileText, AtSign, Bell, CheckCheck, Hash
 } from 'lucide-react';
 import { db, storage } from '../lib/firebase';
 import {
@@ -11,6 +11,7 @@ import {
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { getCurrentUser, getUsers } from '../lib/auth';
 import { Engineer } from '../types/database.types';
+import { useProjectNames } from '../lib/useProjectNames';
 
 interface ChatMessage {
   id: string;
@@ -57,7 +58,7 @@ function getReplyPreviewText(msg: ChatMessage): string {
 }
 
 function renderTextWithMentions(text: string, currentUsername?: string) {
-  const parts = text.split(/(@\w+)/g);
+  const parts = text.split(/(@\w+|#\[[^\]]+\])/g);
   return parts.map((part, i) => {
     if (/^@\w+$/.test(part)) {
       const isSelf = currentUsername && part === `@${currentUsername}`;
@@ -66,6 +67,13 @@ function renderTextWithMentions(text: string, currentUsername?: string) {
           key={i}
           className={`font-semibold ${isSelf ? 'bg-yellow-200 text-yellow-800 rounded px-0.5' : 'text-emerald-600'}`}
         >
+          {part}
+        </span>
+      );
+    }
+    if (/^#\[.+\]$/.test(part)) {
+      return (
+        <span key={i} className="font-semibold text-blue-500">
           {part}
         </span>
       );
@@ -91,6 +99,10 @@ export const ChatPage: React.FC<{ onMentionCountChange?: (count: number) => void
   // @ mention
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<{ username: string; displayName: string }[]>([]);
+
+  // # project mention
+  const [projectMentionQuery, setProjectMentionQuery] = useState<string | null>(null);
+  const projectNames = useProjectNames();
 
   // Mention notifications
   const [myMentions, setMyMentions] = useState<MentionNotification[]>([]);
@@ -160,11 +172,18 @@ export const ChatPage: React.FC<{ onMentionCountChange?: (count: number) => void
     const el = e.target;
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
-    const match = val.match(/@(\w*)$/);
-    if (match) {
-      setMentionQuery(match[1].toLowerCase());
+    const mentionMatch = val.match(/@(\w*)$/);
+    if (mentionMatch) {
+      setMentionQuery(mentionMatch[1].toLowerCase());
+      setProjectMentionQuery(null);
     } else {
       setMentionQuery(null);
+      const projMatch = val.match(/#([^#\n]*)$/);
+      if (projMatch) {
+        setProjectMentionQuery(projMatch[1].toLowerCase());
+      } else {
+        setProjectMentionQuery(null);
+      }
     }
   };
 
@@ -176,10 +195,21 @@ export const ChatPage: React.FC<{ onMentionCountChange?: (count: number) => void
       )
     : [];
 
+  const filteredProjects = projectMentionQuery !== null
+    ? projectNames.filter((p) => p.toLowerCase().includes(projectMentionQuery)).slice(0, 6)
+    : [];
+
   const insertMention = (username: string) => {
     const newInput = input.replace(/@(\w*)$/, `@${username} `);
     setInput(newInput);
     setMentionQuery(null);
+    inputRef.current?.focus();
+  };
+
+  const insertProjectMention = (projectName: string) => {
+    const newInput = input.replace(/#([^#\n]*)$/, `#[${projectName}] `);
+    setInput(newInput);
+    setProjectMentionQuery(null);
     inputRef.current?.focus();
   };
 
@@ -278,6 +308,7 @@ export const ChatPage: React.FC<{ onMentionCountChange?: (count: number) => void
       if (inputRef.current) inputRef.current.style.height = 'auto';
       setReplyTo(null);
       setMentionQuery(null);
+      setProjectMentionQuery(null);
       // Fire-and-forget: create notifications + send emails
       void notifyMentions(mentions, msgRef.id, text);
     } catch (err) {
@@ -672,6 +703,22 @@ export const ChatPage: React.FC<{ onMentionCountChange?: (count: number) => void
           </div>
         )}
 
+        {/* # project mention dropdown */}
+        {projectMentionQuery !== null && filteredProjects.length > 0 && (
+          <div className="mx-4 mb-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+            {filteredProjects.map((p) => (
+              <button
+                key={p}
+                onClick={() => insertProjectMention(p)}
+                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-blue-50 text-left text-sm"
+              >
+                <Hash size={14} className="text-blue-500 flex-shrink-0" />
+                <span className="font-medium text-slate-800">{p}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <form onSubmit={handleSend} className="p-4 flex flex-col gap-2">
           {sendError && <p className="text-xs text-rose-600 font-medium px-1">{sendError}</p>}
           {uploadProgress !== null && (
@@ -735,9 +782,9 @@ export const ChatPage: React.FC<{ onMentionCountChange?: (count: number) => void
                     e.preventDefault();
                     sendMessage();
                   }
-                  if (e.key === 'Escape') { setMentionQuery(null); setReplyTo(null); }
+                  if (e.key === 'Escape') { setMentionQuery(null); setProjectMentionQuery(null); setReplyTo(null); }
                 }}
-                placeholder="Nhập tin nhắn... (dùng @ để nhắc ai đó)"
+                placeholder="Nhập tin nhắn... (dùng @ để nhắc ai đó, # để nhắc đề án)"
                 disabled={!db || !currentUser || sending}
                 rows={1}
                 className="flex-1 min-w-0 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm resize-none overflow-hidden"
