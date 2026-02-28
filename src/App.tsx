@@ -30,6 +30,7 @@ import { ReportsPage } from './components/ReportsPage';
 import { ChatPage } from './components/ChatPage';
 import { BulletinBoardPage } from './components/BulletinBoardPage';
 import { LoginGate } from './components/LoginGate';
+import { SettingsPage } from './components/SettingsPage';
 import { db, isFirebaseConfigured } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { Task } from './types/database.types';
@@ -131,6 +132,7 @@ export default function App() {
                  activeTab === 'salary' ? 'Tính lương' :
                  activeTab === 'chat' ? 'Chat nội bộ' :
                  activeTab === 'bulletin' ? 'Bảng tin' :
+                 activeTab === 'settings' ? 'Cài đặt' :
                  'Báo cáo'}
               </h2>
               <p className="text-slate-500 mt-1 text-xs lg:text-base hidden sm:block">
@@ -146,7 +148,9 @@ export default function App() {
                   ? 'Nhắn tin và trao đổi với các thành viên trong nhóm.'
                   : activeTab === 'bulletin'
                   ? 'Cập nhật tin tức và thông báo của công ty.'
-                  : 'Thống kê và phân tích hiệu suất toàn đội.'}
+                  : activeTab === 'settings'
+                   ? 'Quản lý người dùng và phân quyền truy cập.'
+                   : 'Thống kê và phân tích hiệu suất toàn đội.'}
               </p>
             </div>
           </div>
@@ -189,6 +193,8 @@ export default function App() {
             <ChatPage />
           ) : activeTab === 'bulletin' ? (
             <BulletinBoardPage userRole={role} />
+          ) : activeTab === 'settings' && perms.canViewSettings ? (
+            <SettingsPage />
           ) : activeTab === 'dashboard' ? (
             <div className="space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
