@@ -45,7 +45,7 @@ import { OrgChartPage } from './components/OrgChartPage';
 import { db, isFirebaseConfigured } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot, where, Timestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { Task, Engineer } from './types/database.types';
-import { isAuthenticated, getCurrentUser } from './lib/auth';
+import { isAuthenticated, getCurrentUser, logout } from './lib/auth';
 import { type UserRole, getPermissions, ROLE_LABELS } from './lib/permissions';
 
 export default function App() {
@@ -67,6 +67,7 @@ export default function App() {
   const [calendarMentionNotifications, setCalendarMentionNotifications] = useState<{ id: string; messageId: string; sourceTitle: string; mentionerName: string; eventDate?: string }[]>([]);
   const [newChatMessageCount, setNewChatMessageCount] = useState(0);
   const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null);
+  const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const [lastChatVisit, setLastChatVisit] = useState<number>(() => {
     const stored = localStorage.getItem('lastChatVisit');
     return stored ? parseInt(stored, 10) : Date.now();
@@ -245,6 +246,21 @@ export default function App() {
   const role: UserRole = appUser?.role ?? 'engineer';
   const perms = getPermissions(role);
 
+  const handleLogout = () => {
+    logout();
+    setAuthenticated(false);
+    setAppUser(null);
+    setMentionCount(0);
+    setTaskMentionCount(0);
+    setBulletinMentionCount(0);
+    setCalendarMentionCount(0);
+    setUserPhotoUrl(null);
+    setTaskMentionNotifications([]);
+    setBulletinMentionNotifications([]);
+    setCalendarMentionNotifications([]);
+    setShowAvatarMenu(false);
+  };
+
   const sidebarUser = appUser
     ? { username: appUser.username, displayName: appUser.displayName, role: appUser.role, photoUrl: userPhotoUrl }
     : null;
@@ -265,7 +281,7 @@ export default function App() {
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         userRole={role}
-        onLogout={() => { setAuthenticated(false); setAppUser(null); setMentionCount(0); setTaskMentionCount(0); setBulletinMentionCount(0); setCalendarMentionCount(0); setUserPhotoUrl(null); setTaskMentionNotifications([]); setBulletinMentionNotifications([]); setCalendarMentionNotifications([]); }}
+        onLogout={handleLogout}
         mentionCount={mentionCount}
         taskMentionCount={taskMentionCount}
         bulletinMentionCount={bulletinMentionCount}
@@ -320,18 +336,39 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             {appUser && (
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden">
-                  {userPhotoUrl ? (
-                    <img src={userPhotoUrl} alt={appUser.displayName} className="w-full h-full object-cover" />
-                  ) : (
-                    appUser.displayName.slice(0, 2).toUpperCase()
-                  )}
-                </div>
-                <div className="hidden sm:block">
-                  <p className="text-sm font-medium text-slate-700 leading-tight">{appUser.displayName}</p>
-                  <p className="text-xs text-slate-500 leading-tight">{ROLE_LABELS[role]}</p>
-                </div>
+              <div className="relative">
+                <button
+                  className="flex items-center gap-2 focus:outline-none"
+                  onClick={() => setShowAvatarMenu(v => !v)}
+                  title="Tùy chọn tài khoản"
+                >
+                  <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity">
+                    {userPhotoUrl ? (
+                      <img src={userPhotoUrl} alt={appUser.displayName} className="w-full h-full object-cover" />
+                    ) : (
+                      appUser.displayName.charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <div className="hidden sm:block text-left">
+                    <p className="text-sm font-medium text-slate-700 leading-tight">{appUser.displayName}</p>
+                    <p className="text-xs text-slate-500 leading-tight">{ROLE_LABELS[role]}</p>
+                  </div>
+                </button>
+                {showAvatarMenu && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setShowAvatarMenu(false)} onKeyDown={(e) => e.key === 'Escape' && setShowAvatarMenu(false)} />
+                    <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-slate-200 z-40 overflow-hidden">
+                      <button
+                        className="w-full flex items-center gap-2 px-4 py-3 text-sm text-rose-600 hover:bg-rose-50 transition-colors"
+                        onClick={handleLogout}
+                        aria-label="Logout"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        Đăng xuất
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
