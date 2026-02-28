@@ -26,10 +26,11 @@ interface SidebarProps {
   mentionCount?: number;
   taskMentionCount?: number;
   bulletinMentionCount?: number;
+  calendarMentionCount?: number;
   appUser?: SidebarUser | null;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, userRole, onLogout, mentionCount = 0, taskMentionCount = 0, bulletinMentionCount = 0, appUser }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, userRole, onLogout, mentionCount = 0, taskMentionCount = 0, bulletinMentionCount = 0, calendarMentionCount = 0, appUser }) => {
   const perms = getPermissions(userRole);
 
   const allMenuItems = [
@@ -117,6 +118,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
               {item.id === 'bulletin' && bulletinMentionCount > 0 && (
                 <span className="min-w-[20px] h-5 flex items-center justify-center bg-rose-500 text-white text-xs font-bold rounded-full px-1.5">
                   {bulletinMentionCount > 99 ? '99+' : bulletinMentionCount}
+                </span>
+              )}
+              {item.id === 'calendar' && calendarMentionCount > 0 && (
+                <span className="min-w-[20px] h-5 flex items-center justify-center bg-rose-500 text-white text-xs font-bold rounded-full px-1.5">
+                  {calendarMentionCount > 99 ? '99+' : calendarMentionCount}
                 </span>
               )}
             </button>

@@ -9,6 +9,8 @@ import {
   Edit2,
   AtSign,
   Hash,
+  Bell,
+  CheckCircle2,
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import {
@@ -44,11 +46,20 @@ interface CalendarEvent {
   id: string;
   title: string;
   date: string; // YYYY-MM-DD
+  time?: string; // HH:MM
   description?: string;
   color?: string;
   createdBy: string;
   createdByUsername: string;
   createdAt: Timestamp | null;
+}
+
+interface CalendarMentionNotification {
+  id: string;
+  messageId: string;
+  sourceTitle: string;
+  mentionerName: string;
+  eventDate?: string;
 }
 
 const EVENT_COLORS = [
@@ -92,13 +103,17 @@ function renderTextWithMentions(text: string, currentUsername?: string) {
   });
 }
 
-export const InternalCalendarPage: React.FC = () => {
+export const InternalCalendarPage: React.FC<{
+  calendarMentionNotifications?: CalendarMentionNotification[];
+  onAcknowledgeNotification?: (id: string) => void;
+}> = ({ calendarMentionNotifications = [], onAcknowledgeNotification }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const [newTime, setNewTime] = useState('');
   const [newColor, setNewColor] = useState('emerald');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -107,6 +122,7 @@ export const InternalCalendarPage: React.FC = () => {
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
+  const [editTime, setEditTime] = useState('');
   const [editColor, setEditColor] = useState('emerald');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -163,17 +179,45 @@ export const InternalCalendarPage: React.FC = () => {
     setSaving(true);
     setSaveError(null);
     try {
-      await addDoc(collection(db, 'calendar_events'), {
+      const docRef = await addDoc(collection(db, 'calendar_events'), {
         title: newTitle.trim(),
         date: selectedDateStr,
+        time: newTime || null,
         description: newDesc.trim() || null,
         color: newColor,
         createdBy: currentUser.displayName,
         createdByUsername: currentUser.username,
         createdAt: serverTimestamp(),
       });
+      // Create mention notifications for mentioned users
+      const allText = `${newTitle} ${newDesc}`;
+      const mentions = allText.match(/@(\w+)/g)?.map((m) => m.slice(1)) ?? [];
+      const expandedMentions = mentions.includes('all')
+        ? [...new Set([...allUsers.map((u) => u.username), ...mentions.filter((m) => m !== 'all')])]
+        : mentions;
+      const uniqueMentions = [...new Set(expandedMentions)].filter((m) => m !== currentUser.username);
+      await Promise.all(
+        uniqueMentions.map(async (mentionedUsername) => {
+          try {
+            await addDoc(collection(db, 'mention_notifications'), {
+              mentionedUsername,
+              mentionerName: currentUser.displayName,
+              messageText: newTitle.trim(),
+              messageId: docRef.id,
+              acknowledged: false,
+              source: 'calendar',
+              sourceTitle: newTitle.trim(),
+              eventDate: selectedDateStr,
+              createdAt: serverTimestamp(),
+            });
+          } catch (e) {
+            console.error('Failed to create calendar mention notification:', e);
+          }
+        }),
+      );
       setNewTitle('');
       setNewDesc('');
+      setNewTime('');
       setNewColor('emerald');
       setShowAddForm(false);
     } catch (err) {
@@ -200,6 +244,7 @@ export const InternalCalendarPage: React.FC = () => {
     try {
       await updateDoc(doc(db, 'calendar_events', editingEventId), {
         title: editTitle.trim(),
+        time: editTime || null,
         description: editDesc.trim() || null,
         color: editColor,
       });
@@ -218,6 +263,7 @@ export const InternalCalendarPage: React.FC = () => {
     setEditingEventId(ev.id);
     setEditTitle(ev.title);
     setEditDesc(ev.description ?? '');
+    setEditTime(ev.time ?? '');
     setEditColor(ev.color ?? 'emerald');
     setEditError(null);
     setEditMentionQuery(null);
@@ -336,6 +382,46 @@ export const InternalCalendarPage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
+      {/* Calendar mention notifications banner */}
+      {calendarMentionNotifications.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
+          <div className="flex items-center gap-2 mb-1">
+            <Bell size={16} className="text-amber-600 flex-shrink-0" />
+            <p className="text-sm font-semibold text-amber-800">Bạn được nhắc đến trong lịch nội bộ:</p>
+          </div>
+          {calendarMentionNotifications.map((notif) => (
+            <div key={notif.id} className="flex items-center gap-2 bg-white border border-amber-100 rounded-xl px-3 py-2">
+              <Calendar size={14} className="text-amber-500 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="text-sm text-slate-800 font-medium truncate">{notif.sourceTitle}</span>
+                <span className="text-xs text-slate-500 ml-1.5">bởi {notif.mentionerName}</span>
+              </div>
+              <button
+                onClick={() => {
+                  if (notif.eventDate) {
+                    const [year, month, day] = notif.eventDate.split('-').map(Number);
+                    const d = new Date(year, month - 1, day);
+                    setSelectedDate(d);
+                    setCurrentDate(d);
+                  }
+                  onAcknowledgeNotification?.(notif.id);
+                }}
+                className="flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition-colors flex-shrink-0"
+              >
+                <Calendar size={12} />
+                Xem
+              </button>
+              <button
+                onClick={() => onAcknowledgeNotification?.(notif.id)}
+                title="Đánh dấu đã đọc"
+                className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors flex-shrink-0"
+              >
+                <CheckCircle2 size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Calendar grid */}
         <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
@@ -478,6 +564,15 @@ export const InternalCalendarPage: React.FC = () => {
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                 autoFocus
               />
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-slate-500 flex-shrink-0">Thời gian:</label>
+                <input
+                  type="time"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                />
+              </div>
               <input
                 ref={descInputRef}
                 type="text"
@@ -512,6 +607,7 @@ export const InternalCalendarPage: React.FC = () => {
                     setSaveError(null);
                     setNewTitle('');
                     setNewDesc('');
+                    setNewTime('');
                     setMentionQuery(null);
                     setProjectMentionQuery(null);
                   }}
@@ -591,6 +687,15 @@ export const InternalCalendarPage: React.FC = () => {
                         className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                         autoFocus
                       />
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-slate-500 flex-shrink-0">Thời gian:</label>
+                        <input
+                          type="time"
+                          value={editTime}
+                          onChange={(e) => setEditTime(e.target.value)}
+                          className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                        />
+                      </div>
                       <input
                         ref={editDescInputRef}
                         type="text"
@@ -642,6 +747,9 @@ export const InternalCalendarPage: React.FC = () => {
                       <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${colorConf.dotClass}`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-slate-800 break-words">{renderTextWithMentions(ev.title, currentUser?.username)}</p>
+                        {ev.time && (
+                          <p className="text-xs font-medium text-emerald-600 mt-0.5">🕐 {ev.time}</p>
+                        )}
                         {ev.description && (
                           <p className="text-xs text-slate-500 mt-0.5 break-words">{renderTextWithMentions(ev.description, currentUser?.username)}</p>
                         )}
