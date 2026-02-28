@@ -8,6 +8,7 @@ export type Project = {
 export type Task = {
   id: string;
   project_id: string;
+  parentId?: string | null;
   engineer_name: string;
   drawing_name: string;
   description: string | null;
