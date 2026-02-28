@@ -197,6 +197,16 @@ export default function App() {
     t => t.deadline && new Date(t.deadline) < now && t.status !== 'Hoàn thành'
   ).length;
 
+  const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const deadlineSoonTasks = tasks.filter(
+    t =>
+      t.status === 'Đang làm' &&
+      t.deadline &&
+      new Date(t.deadline) >= now &&
+      new Date(t.deadline) <= oneWeekFromNow &&
+      t.engineer_name === (appUser?.displayName ?? '')
+  );
+
   const chartData = tasks.slice(0, 7).map(t => ({
     name: t.drawing_name.length > 10 ? t.drawing_name.slice(0, 10) + '...' : t.drawing_name,
     productivity: t.actual_hours > 0 ? (t.target_hours / t.actual_hours) * 100 : 0,
@@ -282,6 +292,7 @@ export default function App() {
         taskMentionCount={taskMentionCount}
         bulletinMentionCount={bulletinMentionCount}
         calendarMentionCount={calendarMentionCount}
+        deadlineSoonCount={deadlineSoonTasks.length}
         appUser={sidebarUser}
       />
 
@@ -502,6 +513,7 @@ export default function App() {
                 canAddTask={perms.canAddTask}
                 onAddTask={() => setShowTaskForm(true)}
                 taskMentionNotifications={taskMentionNotifications}
+                deadlineSoonTasks={deadlineSoonTasks}
               />
             </div>
           )}

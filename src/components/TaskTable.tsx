@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ExternalLink, Eye, MoreVertical, Star, Download, Search, Filter, FileDown, FileSpreadsheet, X, MessageSquare, ChevronRight, ChevronDown, Plus, Bell, CheckCircle2 } from 'lucide-react';
+import { ExternalLink, Eye, MoreVertical, Star, Download, Search, Filter, FileDown, FileSpreadsheet, X, MessageSquare, ChevronRight, ChevronDown, Plus, Bell, CheckCircle2, AlertCircle } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { Task } from '../types/database.types';
 import { TaskContextMenu } from './TaskContextMenu';
@@ -11,7 +11,7 @@ import { doc, updateDoc, collection, query, where, onSnapshot } from 'firebase/f
 const COLUMNS = [
   { key: 'drawing_name' as const, label: 'Tên công việc', defaultWidth: 160 },
   { key: 'description' as const, label: 'Thông tin công việc', defaultWidth: 200 },
-  { key: 'engineer_name' as const, label: 'Kỹ sư', defaultWidth: 130 },
+  { key: 'engineer_name' as const, label: 'Người phụ trách', defaultWidth: 130 },
   { key: 'difficulty' as const, label: 'Độ khó', defaultWidth: 100 },
   { key: 'status' as const, label: 'Trạng thái', defaultWidth: 115 },
   { key: 'deadline' as const, label: 'Hạn chót', defaultWidth: 115 },
@@ -19,6 +19,7 @@ const COLUMNS = [
   { key: 'cost' as const, label: 'Giá thành', defaultWidth: 130 },
   { key: 'actual_hours' as const, label: 'Giờ thực tế', defaultWidth: 115 },
   { key: 'drive_link' as const, label: 'Tải về', defaultWidth: 90 },
+  { key: 'viewer_link' as const, label: 'Xem bản vẽ', defaultWidth: 105 },
   { key: 'comments' as const, label: 'Bình luận', defaultWidth: 95 },
   { key: 'actions' as const, label: 'Thao tác', defaultWidth: 105 },
 ];
@@ -81,11 +82,12 @@ interface TaskTableProps {
   canAddTask?: boolean;
   onAddTask?: () => void;
   taskMentionNotifications?: TaskMentionNotification[];
+  deadlineSoonTasks?: Task[];
 }
 
 function exportToCSV(tasks: Task[]) {
   const headers = [
-    'Tên công việc', 'Thông tin công việc', 'Kỹ sư', 'Độ khó', 'Trạng thái', 'Hạn chót',
+    'Tên công việc', 'Thông tin công việc', 'Người phụ trách', 'Độ khó', 'Trạng thái', 'Hạn chót',
     'Giờ mục tiêu', 'Giờ thực tế', 'Năng suất (%)', 'Giá thành (VNĐ)', 'Link Drive', 'Ngày tạo',
   ];
   const rows = tasks.map(t => [
@@ -131,7 +133,7 @@ async function exportToExcel(tasks: Task[]) {
   sheet.columns = [
     { header: 'Tên công việc', key: 'drawing_name', width: 28 },
     { header: 'Thông tin công việc', key: 'description', width: 32 },
-    { header: 'Kỹ sư', key: 'engineer', width: 18 },
+    { header: 'Người phụ trách', key: 'engineer', width: 18 },
     { header: 'Độ khó', key: 'difficulty', width: 12 },
     { header: 'Trạng thái', key: 'status', width: 16 },
     { header: 'Hạn chót', key: 'deadline', width: 14 },
@@ -196,7 +198,7 @@ async function exportToExcel(tasks: Task[]) {
   URL.revokeObjectURL(url);
 }
 
-export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDrawing, canEdit = true, canDelete = true, canAddTask = false, onAddTask, taskMentionNotifications = [] }) => {
+export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDrawing, canEdit = true, canDelete = true, canAddTask = false, onAddTask, taskMentionNotifications = [], deadlineSoonTasks = [] }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -379,6 +381,30 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
           ))}
         </div>
       )}
+      {/* Deadline-soon notifications */}
+      {deadlineSoonTasks.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 space-y-2">
+          <div className="flex items-center gap-2 mb-1">
+            <Bell size={16} className="text-orange-600 flex-shrink-0" />
+            <p className="text-sm font-semibold text-orange-800">
+              Bạn có <span className="font-bold">{deadlineSoonTasks.length}</span> công việc sắp đến hạn trong vòng 1 tuần:
+            </p>
+          </div>
+          {deadlineSoonTasks.map((t) => (
+            <div key={t.id} className="flex items-center gap-2 bg-white border border-orange-100 rounded-xl px-3 py-2">
+              <AlertCircle size={14} className="text-orange-500 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="text-sm text-slate-800 font-medium truncate">{t.drawing_name}</span>
+                {t.deadline && (
+                  <span className="text-xs text-orange-600 ml-1.5 font-medium">
+                    Hạn: {new Date(t.deadline).toLocaleDateString('vi-VN')}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {/* Filter Bar */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
@@ -400,7 +426,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                 onChange={e => setFilterEngineer(e.target.value)}
                 className="pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all appearance-none"
               >
-                <option value="">Tất cả kỹ sư</option>
+                <option value="">Tất cả người phụ trách</option>
                 {uniqueEngineers.map(eng => (
                   <option key={eng} value={eng}>{eng}</option>
                 ))}
@@ -471,11 +497,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
             ))}
           </colgroup>
           <thead>
-            <tr className="bg-slate-50 border-bottom border-slate-200">
+            <tr className="bg-slate-50 border-bottom border-slate-200 sticky top-0 z-10">
               {COLUMNS.map((col, idx) => (
                 <th
                   key={col.key}
-                  className={`px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap relative select-none ${col.key === 'actions' ? 'text-right' : ''}`}
+                  className={`px-4 md:px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap relative select-none ${col.key === 'actions' ? 'text-right' : ''} ${idx === 0 ? 'sticky left-0 z-20 bg-slate-50' : ''}`}
                 >
                   {col.label}
                   {idx < COLUMNS.length - 1 && (
@@ -491,7 +517,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
           <tbody className="divide-y divide-slate-100">
             {filteredTasks.length === 0 && (
               <tr>
-                <td colSpan={12} className="px-6 py-10 text-center text-slate-400 text-sm">
+                <td colSpan={COLUMNS.length} className="px-6 py-10 text-center text-slate-400 text-sm">
                   {hasActiveFilters ? 'Không tìm thấy công việc phù hợp với bộ lọc.' : 'Chưa có công việc nào.'}
                 </td>
               </tr>
@@ -520,8 +546,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                 const rowCost = childRollupCost !== null ? childRollupCost : t.cost;
 
                 return (
-                  <tr key={t.id} className={`hover:bg-slate-50/50 transition-colors group ${bgClass}`}>
-                    <td className={`py-4 overflow-hidden whitespace-nowrap ${isChild ? 'pl-10 pr-4 md:pl-14 md:pr-6' : 'px-4 md:px-6'}`}>
+                  <tr key={t.id} className={`hover:bg-blue-50 transition-colors group ${bgClass}`}>
+                    <td className={`py-4 overflow-hidden whitespace-nowrap sticky left-0 z-[2] ${bgClass || 'bg-white'} group-hover:bg-blue-50 transition-colors ${isChild ? 'pl-10 pr-4 md:pl-14 md:pr-6' : 'px-4 md:px-6'}`}>
                       <div className="flex items-center gap-1.5">
                         {childHasChildren ? (
                           <button
@@ -637,6 +663,20 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                       )}
                     </td>
                     <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      {t.viewer_link ? (
+                        <button
+                          onClick={() => onViewDrawing(t.viewer_link!)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-xs font-medium transition-colors"
+                          title="Xem bản vẽ (ảnh/PDF)"
+                        >
+                          <Eye size={14} />
+                          Xem
+                        </button>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">Chưa có</span>
+                      )}
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
                       <button
                         onClick={() => setCommentTaskId(t.id)}
                         className="relative flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 border border-slate-200 hover:border-emerald-300 rounded-lg text-xs font-medium transition-colors"
@@ -704,8 +744,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
               return (
                 <React.Fragment key={task.id}>
                   {/* Parent row */}
-                  <tr className={`hover:bg-slate-50/50 transition-colors group ${hasChildren ? 'border-l-2 border-l-emerald-400' : ''} ${rowBgClass}`}>
-                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                  <tr className={`hover:bg-blue-50 transition-colors group ${hasChildren ? 'border-l-2 border-l-emerald-400' : ''} ${rowBgClass}`}>
+                    <td className={`px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap sticky left-0 z-[2] ${rowBgClass || 'bg-white'} group-hover:bg-blue-50 transition-colors`}>
                       <div className="flex items-center gap-1.5">
                         {hasChildren ? (
                           <button
@@ -816,6 +856,20 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                           <Download size={14} />
                           Tải về
                         </a>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">Chưa có</span>
+                      )}
+                    </td>
+                    <td className="px-4 md:px-6 py-4 overflow-hidden whitespace-nowrap">
+                      {task.viewer_link ? (
+                        <button
+                          onClick={() => onViewDrawing(task.viewer_link!)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-xs font-medium transition-colors"
+                          title="Xem bản vẽ (ảnh/PDF)"
+                        >
+                          <Eye size={14} />
+                          Xem
+                        </button>
                       ) : (
                         <span className="text-slate-400 text-xs italic">Chưa có</span>
                       )}

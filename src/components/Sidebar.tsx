@@ -27,10 +27,11 @@ interface SidebarProps {
   taskMentionCount?: number;
   bulletinMentionCount?: number;
   calendarMentionCount?: number;
+  deadlineSoonCount?: number;
   appUser?: SidebarUser | null;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, userRole, onLogout, mentionCount = 0, taskMentionCount = 0, bulletinMentionCount = 0, calendarMentionCount = 0, appUser }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, userRole, onLogout, mentionCount = 0, taskMentionCount = 0, bulletinMentionCount = 0, calendarMentionCount = 0, deadlineSoonCount = 0, appUser }) => {
   const perms = getPermissions(userRole);
 
   const allMenuItems = [
@@ -112,6 +113,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMob
               {item.id === 'tasks' && taskMentionCount > 0 && (
                 <span className="min-w-[20px] h-5 flex items-center justify-center bg-rose-500 text-white text-xs font-bold rounded-full px-1.5">
                   {taskMentionCount > 99 ? '99+' : taskMentionCount}
+                </span>
+              )}
+              {item.id === 'tasks' && deadlineSoonCount > 0 && (
+                <span className="min-w-[20px] h-5 flex items-center justify-center bg-amber-500 text-white text-xs font-bold rounded-full px-1.5" title="Công việc sắp đến hạn">
+                  {deadlineSoonCount > 99 ? '99+' : deadlineSoonCount}
                 </span>
               )}
               {item.id === 'bulletin' && bulletinMentionCount > 0 && (
