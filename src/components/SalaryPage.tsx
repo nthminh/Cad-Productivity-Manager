@@ -114,7 +114,7 @@ export const SalaryPage: React.FC<{ canEditSalary?: boolean }> = ({ canEditSalar
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-bold text-slate-900">Tính lương</h3>
-        <p className="text-sm text-slate-500 mt-0.5">Lương căn bản + lương theo dự án hoàn thành</p>
+        <p className="text-sm text-slate-500 mt-0.5">Lương căn bản + lương theo công việc hoàn thành</p>
       </div>
 
       {/* Summary cards */}
@@ -129,7 +129,7 @@ export const SalaryPage: React.FC<{ canEditSalary?: boolean }> = ({ canEditSalar
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-2">
             <div className="bg-amber-100 p-2 rounded-lg"><TrendingUp size={18} className="text-amber-600" /></div>
-            <span className="text-sm font-semibold text-slate-600">Tổng lương dự án</span>
+            <span className="text-sm font-semibold text-slate-600">Tổng lương công việc</span>
           </div>
           <p className="text-2xl font-bold text-slate-900">{totalProject.toLocaleString('vi-VN')} ₫</p>
         </div>
@@ -152,7 +152,7 @@ export const SalaryPage: React.FC<{ canEditSalary?: boolean }> = ({ canEditSalar
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Chức danh</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Dự án HT</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Lương căn bản (VNĐ)</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Lương dự án (VNĐ)</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Lương công việc (VNĐ)</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tổng lương (VNĐ)</th>
               </tr>
             </thead>

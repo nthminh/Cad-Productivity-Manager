@@ -347,7 +347,7 @@ export const TaskCommentSection: React.FC<Props> = ({ taskId, taskName, onClose 
                   setProjectMentionQuery(null);
                 }
               }}
-              placeholder="Viết bình luận... (dùng @ để nhắc ai đó, # để nhắc đề án)"
+              placeholder="Viết bình luận... (dùng @ để nhắc ai đó, # để nhắc công việc)"
               disabled={!db || !currentUser || sending}
               rows={1}
               className="flex-1 min-w-0 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm resize-none overflow-hidden"

@@ -9,8 +9,8 @@ import { db } from '../lib/firebase';
 import { doc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 
 const COLUMNS = [
-  { key: 'drawing_name' as const, label: 'Tên dự án', defaultWidth: 160 },
-  { key: 'description' as const, label: 'Thông tin dự án', defaultWidth: 200 },
+  { key: 'drawing_name' as const, label: 'Tên công việc', defaultWidth: 160 },
+  { key: 'description' as const, label: 'Thông tin công việc', defaultWidth: 200 },
   { key: 'engineer_name' as const, label: 'Kỹ sư', defaultWidth: 130 },
   { key: 'difficulty' as const, label: 'Độ khó', defaultWidth: 100 },
   { key: 'status' as const, label: 'Trạng thái', defaultWidth: 115 },
@@ -85,7 +85,7 @@ interface TaskTableProps {
 
 function exportToCSV(tasks: Task[]) {
   const headers = [
-    'Tên dự án', 'Thông tin dự án', 'Kỹ sư', 'Độ khó', 'Trạng thái', 'Hạn chót',
+    'Tên công việc', 'Thông tin công việc', 'Kỹ sư', 'Độ khó', 'Trạng thái', 'Hạn chót',
     'Giờ mục tiêu', 'Giờ thực tế', 'Năng suất (%)', 'Giá thành (VNĐ)', 'Link Drive', 'Ngày tạo',
   ];
   const rows = tasks.map(t => [
@@ -126,11 +126,11 @@ async function exportToExcel(tasks: Task[]) {
   workbook.creator = 'CAD Productivity Manager';
   workbook.created = new Date();
 
-  const sheet = workbook.addWorksheet('Dự án CAD');
+  const sheet = workbook.addWorksheet('Công việc CAD');
 
   sheet.columns = [
-    { header: 'Tên dự án', key: 'drawing_name', width: 28 },
-    { header: 'Thông tin dự án', key: 'description', width: 32 },
+    { header: 'Tên công việc', key: 'drawing_name', width: 28 },
+    { header: 'Thông tin công việc', key: 'description', width: 32 },
     { header: 'Kỹ sư', key: 'engineer', width: 18 },
     { header: 'Độ khó', key: 'difficulty', width: 12 },
     { header: 'Trạng thái', key: 'status', width: 16 },
@@ -349,7 +349,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
           <div className="flex items-center gap-2 mb-1">
             <Bell size={16} className="text-amber-600 flex-shrink-0" />
-            <p className="text-sm font-semibold text-amber-800">Bạn được nhắc đến trong bình luận dự án:</p>
+            <p className="text-sm font-semibold text-amber-800">Bạn được nhắc đến trong bình luận công việc:</p>
           </div>
           {taskMentionNotifications.map((notif) => (
             <div key={notif.id} className="flex items-center gap-2 bg-white border border-amber-100 rounded-xl px-3 py-2">
@@ -386,7 +386,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input
               type="text"
-              placeholder="Tìm theo tên dự án..."
+              placeholder="Tìm theo tên công việc..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all"
@@ -457,7 +457,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
         </div>
         {hasActiveFilters && (
           <p className="mt-2 text-xs text-slate-500">
-            Hiển thị {filteredTasks.length} / {rootTasks.length} dự án
+            Hiển thị {filteredTasks.length} / {rootTasks.length} công việc
           </p>
         )}
       </div>
@@ -492,7 +492,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
             {filteredTasks.length === 0 && (
               <tr>
                 <td colSpan={12} className="px-6 py-10 text-center text-slate-400 text-sm">
-                  {hasActiveFilters ? 'Không tìm thấy dự án phù hợp với bộ lọc.' : 'Chưa có dự án nào.'}
+                  {hasActiveFilters ? 'Không tìm thấy công việc phù hợp với bộ lọc.' : 'Chưa có công việc nào.'}
                 </td>
               </tr>
             )}
@@ -652,11 +652,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     </td>
                     <td className="px-4 md:px-6 py-4 text-right overflow-hidden whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1 relative">
-                        {t.viewer_link && (
+                        {(t.viewer_link || t.drive_link) && (
                           <button
-                            onClick={() => onViewDrawing(t.viewer_link!)}
+                            onClick={() => onViewDrawing((t.viewer_link || t.drive_link)!)}
                             className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
-                            title="Xem bản vẽ"
+                            title="Xem nhanh file PDF/ảnh"
                           >
                             <Eye size={18} />
                           </button>
@@ -836,11 +836,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({ tasks, onRefresh, onViewDr
                     </td>
                     <td className="px-4 md:px-6 py-4 text-right overflow-hidden whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1 relative">
-                        {task.viewer_link && (
+                        {(task.viewer_link || task.drive_link) && (
                           <button
-                            onClick={() => onViewDrawing(task.viewer_link!)}
+                            onClick={() => onViewDrawing((task.viewer_link || task.drive_link)!)}
                             className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
-                            title="Xem bản vẽ"
+                            title="Xem nhanh file PDF/ảnh"
                           >
                             <Eye size={18} />
                           </button>

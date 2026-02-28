@@ -560,7 +560,7 @@ export const InternalCalendarPage: React.FC<{
                   if (e.key === 'Enter') handleAddEvent();
                   if (e.key === 'Escape') { setMentionQuery(null); setProjectMentionQuery(null); }
                 }}
-                placeholder="Tên sự kiện * (@ nhắc ai đó, # nhắc đề án)"
+                placeholder="Tên sự kiện * (@ nhắc ai đó, # nhắc công việc)"
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                 autoFocus
               />
@@ -581,7 +581,7 @@ export const InternalCalendarPage: React.FC<{
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') { setMentionQuery(null); setProjectMentionQuery(null); }
                 }}
-                placeholder="Ghi chú (@ nhắc ai đó, # nhắc đề án)"
+                placeholder="Ghi chú (@ nhắc ai đó, # nhắc công việc)"
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
               />
               <div className="flex items-center gap-1.5">
