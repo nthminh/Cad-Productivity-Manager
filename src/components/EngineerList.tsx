@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, X, Save, Pencil, Trash2, User, Camera } from 'lucide-react';
+import { Plus, X, Save, Pencil, Trash2, User, Camera, Search } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { Engineer } from '../types/database.types';
@@ -217,6 +217,7 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editEngineer, setEditEngineer] = useState<Engineer | null>(null);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (!db) { setLoading(false); return; }
@@ -241,20 +242,32 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h3 className="text-lg font-bold text-slate-900">Danh sách kỹ sư</h3>
           <p className="text-sm text-slate-500 mt-0.5">Quản lý thông tin các kỹ sư và nhân viên</p>
         </div>
-        {canManage && (
-          <button
-            onClick={() => { setEditEngineer(null); setShowForm(true); }}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
-          >
-            <Plus size={18} />
-            Thêm kỹ sư
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm kiếm kỹ sư..."
+              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none w-56"
+            />
+          </div>
+          {canManage && (
+            <button
+              onClick={() => { setEditEngineer(null); setShowForm(true); }}
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+            >
+              <Plus size={18} />
+              Thêm kỹ sư
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
@@ -280,7 +293,23 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
               {!loading && engineers.length === 0 && (
                 <tr><td colSpan={9} className="px-6 py-10 text-center text-slate-400 text-sm">Chưa có kỹ sư nào. Nhấn "Thêm kỹ sư" để bắt đầu.</td></tr>
               )}
-              {engineers.map(eng => (
+              {!loading && engineers.length > 0 && (() => {
+                const q = search.trim().toLowerCase();
+                const filtered = q
+                  ? engineers.filter((eng) =>
+                      eng.full_name.toLowerCase().includes(q) ||
+                      eng.position.toLowerCase().includes(q) ||
+                      (eng.department ?? '').toLowerCase().includes(q) ||
+                      (eng.email ?? '').toLowerCase().includes(q) ||
+                      (eng.phone ?? '').includes(q),
+                    )
+                  : engineers;
+                if (filtered.length === 0) {
+                  return (
+                    <tr><td colSpan={9} className="px-6 py-10 text-center text-slate-400 text-sm">Không tìm thấy kỹ sư phù hợp.</td></tr>
+                  );
+                }
+                return filtered.map(eng => (
                 <tr key={eng.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4">
                     {eng.photo_url ? (
@@ -346,7 +375,8 @@ export const EngineerList: React.FC<{ canManage?: boolean }> = ({ canManage = tr
                     )}
                   </td>
                 </tr>
-              ))}
+              ));
+            })()}
             </tbody>
           </table>
         </div>

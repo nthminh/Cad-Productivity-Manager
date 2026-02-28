@@ -17,6 +17,7 @@ export type Department = {
   name: string;
   colorKey: string;
   order: number;
+  parentId?: string;
 };
 
 export const COLOR_OPTIONS = ['rose', 'blue', 'amber', 'emerald', 'purple', 'slate', 'cyan', 'orange'] as const;
@@ -146,15 +147,24 @@ export function useDepartments() {
     };
   }, []);
 
-  const addDepartment = async (name: string, colorKey: string): Promise<void> => {
+  const addDepartment = async (name: string, colorKey: string, parentId?: string): Promise<void> => {
     if (!db) return;
-    const maxOrder = departments.length > 0 ? Math.max(...departments.map((d) => d.order)) : -1;
-    await addDoc(collection(db, 'departments'), { name, colorKey, order: maxOrder + 1 });
+    const siblings = departments.filter((d) => (d.parentId ?? '') === (parentId ?? ''));
+    const maxOrder = siblings.length > 0 ? Math.max(...siblings.map((d) => d.order)) : -1;
+    const data: { name: string; colorKey: string; order: number; parentId?: string } = {
+      name,
+      colorKey,
+      order: maxOrder + 1,
+    };
+    if (parentId) data.parentId = parentId;
+    await addDoc(collection(db, 'departments'), data);
   };
 
-  const updateDepartment = async (id: string, name: string, colorKey: string): Promise<void> => {
+  const updateDepartment = async (id: string, name: string, colorKey: string, parentId?: string): Promise<void> => {
     if (!db) return;
-    await updateDoc(doc(db, 'departments', id), { name, colorKey });
+    const data: { name: string; colorKey: string; parentId?: string } = { name, colorKey };
+    if (parentId !== undefined) data.parentId = parentId || undefined;
+    await updateDoc(doc(db, 'departments', id), data);
   };
 
   const deleteDepartment = async (id: string): Promise<void> => {
@@ -162,5 +172,22 @@ export function useDepartments() {
     await deleteDoc(doc(db, 'departments', id));
   };
 
-  return { departments, loading, addDepartment, updateDepartment, deleteDepartment };
+  const reorderDepartment = async (id: string, direction: 'up' | 'down'): Promise<void> => {
+    if (!db) return;
+    const dept = departments.find((d) => d.id === id);
+    if (!dept) return;
+    const siblings = departments
+      .filter((d) => (d.parentId ?? '') === (dept.parentId ?? ''))
+      .sort((a, b) => a.order - b.order);
+    const idx = siblings.findIndex((d) => d.id === id);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= siblings.length) return;
+    const other = siblings[swapIdx];
+    await Promise.all([
+      updateDoc(doc(db, 'departments', id), { order: other.order }),
+      updateDoc(doc(db, 'departments', other.id), { order: dept.order }),
+    ]);
+  };
+
+  return { departments, loading, addDepartment, updateDepartment, deleteDepartment, reorderDepartment };
 }
