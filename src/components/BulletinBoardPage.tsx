@@ -111,6 +111,36 @@ async function compressImageToDataUrl(file: File, maxWidth = 800, quality = 0.5)
   });
 }
 
+async function compressImageToBlob(file: File, maxWidth = 800, quality = 0.5): Promise<Blob> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(file);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => resolve(blob ?? file), 'image/jpeg', quality);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+    img.src = objectUrl;
+  });
+}
+
 function sanitizeHtml(html: string): string {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   doc.querySelectorAll('script, style, iframe, object, embed, form').forEach((el) => el.remove());
@@ -485,8 +515,13 @@ const PostCard: React.FC<PostCardProps> = ({ post, userRole, onDelete, onEdit })
     setUploadingEditImage(true);
     setEditImageUploadError(null);
     try {
-      const dataUrl = await compressImageToDataUrl(file);
-      setEditImageUrl(dataUrl);
+      if (!storage) throw new Error('Firebase Storage chưa được cấu hình.');
+      const blob = await compressImageToBlob(file);
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const fileRef = storageRef(storage, `bulletin_images/${Date.now()}_${safeName}`);
+      await uploadBytes(fileRef, blob, { contentType: 'image/jpeg' });
+      const downloadUrl = await getDownloadURL(fileRef);
+      setEditImageUrl(downloadUrl);
       URL.revokeObjectURL(localUrl);
       setEditImageLocalPreview(null);
     } catch (err) {
@@ -800,7 +835,11 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
   const handleImagePaste = async (file: File): Promise<string> => {
     setUploadingImage(true);
     try {
-      return await compressImageToDataUrl(file);
+      if (!storage) throw new Error('Firebase Storage chưa được cấu hình.');
+      const blob = await compressImageToBlob(file);
+      const fileRef = storageRef(storage, `bulletin_images/${Date.now()}_${crypto.randomUUID()}.jpg`);
+      await uploadBytes(fileRef, blob, { contentType: 'image/jpeg' });
+      return await getDownloadURL(fileRef);
     } finally {
       setUploadingImage(false);
     }
@@ -815,8 +854,13 @@ export const BulletinBoardPage: React.FC<BulletinBoardPageProps> = ({ userRole }
     setUploadingImage(true);
     setImageUploadError(null);
     try {
-      const dataUrl = await compressImageToDataUrl(file);
-      setImageUrl(dataUrl);
+      if (!storage) throw new Error('Firebase Storage chưa được cấu hình.');
+      const blob = await compressImageToBlob(file);
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const fileRef = storageRef(storage, `bulletin_images/${Date.now()}_${safeName}`);
+      await uploadBytes(fileRef, blob, { contentType: 'image/jpeg' });
+      const downloadUrl = await getDownloadURL(fileRef);
+      setImageUrl(downloadUrl);
       URL.revokeObjectURL(localUrl);
       setImageLocalPreview(null);
     } catch (err) {
