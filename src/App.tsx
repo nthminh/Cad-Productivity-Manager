@@ -42,6 +42,7 @@ import { LoginGate } from './components/LoginGate';
 import { SettingsPage } from './components/SettingsPage';
 import { InternalCalendarPage } from './components/InternalCalendarPage';
 import { OrgChartPage } from './components/OrgChartPage';
+import { NotesPage } from './components/NotesPage';
 import { db, isFirebaseConfigured } from './lib/firebase';
 import { collection, query, orderBy, onSnapshot, where, Timestamp, doc, updateDoc } from 'firebase/firestore';
 import { Task, Engineer } from './types/database.types';
@@ -324,7 +325,7 @@ export default function App() {
       />
 
       <div className="lg:pl-64 flex-1 flex flex-col">
-        <header className="flex items-center justify-between p-4 lg:p-8 bg-slate-50/80 backdrop-blur-sm sticky top-0 z-20 border-b border-slate-200">
+        <header className={`flex items-center justify-between p-4 lg:p-8 bg-slate-50/80 backdrop-blur-sm sticky top-0 z-20 border-b border-slate-200${activeTab === 'chat' ? ' hidden' : ''}`}>
           <div className="flex items-center gap-4">
             <button 
               className="lg:hidden text-slate-600 hover:text-slate-900"
@@ -341,6 +342,7 @@ export default function App() {
                  activeTab === 'bulletin' ? 'Bảng tin' :
                  activeTab === 'calendar' ? 'Lịch nội bộ' :
                  activeTab === 'orgchart' ? 'Sơ đồ phòng ban' :
+                 activeTab === 'notes' ? 'Ghi chú' :
                  activeTab === 'settings' ? 'Cài đặt' :
                  'Báo cáo'}
               </h2>
@@ -359,6 +361,8 @@ export default function App() {
                   ? 'Lịch nội bộ và các sự kiện quan trọng của đội.'
                   : activeTab === 'orgchart'
                   ? 'Cấu trúc tổ chức và nhân sự theo phòng ban.'
+                  : activeTab === 'notes'
+                  ? 'Ghi chú cá nhân theo phong cách Google Keep.'
                   : activeTab === 'settings'
                    ? 'Quản lý người dùng và phân quyền truy cập.'
                    : 'Tổng quan và thống kê hiệu suất toàn đội.'}
@@ -405,7 +409,7 @@ export default function App() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
+        <main className={`flex-1 min-h-0${activeTab === 'chat' ? ' p-0 overflow-hidden flex flex-col' : ' p-4 lg:p-8 overflow-y-auto'}`}>
           {error && (
             <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-700">
               <AlertCircle size={20} />
@@ -516,6 +520,8 @@ export default function App() {
             />
           ) : activeTab === 'orgchart' ? (
             <OrgChartPage tasks={tasks} />
+          ) : activeTab === 'notes' ? (
+            <NotesPage />
           ) : activeTab === 'settings' && perms.canViewSettings ? (
             <SettingsPage />
           ) : (
