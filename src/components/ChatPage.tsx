@@ -318,7 +318,6 @@ export const ChatPage: React.FC<{ onMentionCountChange?: (count: number) => void
       setReplyTo(null);
       setMentionQuery(null);
       setProjectMentionQuery(null);
-      inputRef.current?.focus();
       // Fire-and-forget: create notifications + send emails
       void notifyMentions(mentions, msgRef.id, text);
     } catch (err) {
@@ -327,6 +326,8 @@ export const ChatPage: React.FC<{ onMentionCountChange?: (count: number) => void
     } finally {
       setSending(false);
     }
+    // Refocus after setSending(false) re-enables the textarea
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const handleSend = async (e: React.FormEvent) => {
