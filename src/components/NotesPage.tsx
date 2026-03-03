@@ -4,7 +4,6 @@ import { db } from '../lib/firebase';
 import {
   collection,
   query,
-  orderBy,
   onSnapshot,
   addDoc,
   deleteDoc,
@@ -76,10 +75,11 @@ export const NotesPage: React.FC = () => {
     const q = query(
       collection(db, 'notes'),
       where('username', '==', currentUser.username),
-      orderBy('updatedAt', 'desc'),
     );
     const unsub = onSnapshot(q, (snap) => {
-      setNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Note)));
+      const notesList = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Note));
+      notesList.sort((a, b) => (b.updatedAt?.toMillis() ?? 0) - (a.updatedAt?.toMillis() ?? 0));
+      setNotes(notesList);
       setLoading(false);
     }, (err) => { console.error('Failed to load notes:', err); setLoading(false); });
     return () => unsub();
